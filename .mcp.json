@@ -1,0 +1,46 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schema/server-manifest/v1.json",
+  "name": "saie",
+  "displayName": "SAIE — SketchUp Automation & Intelligence Engine",
+  "description": "AI-powered architectural modeling for SketchUp 2025. Build walls, cut openings, place components, run clash detection, generate walkthroughs, and inspect any entity in the model. 67+ tools. Includes a browser-friendly HTTP MJPEG live view.",
+  "version": "1.0.0",
+  "homepage": "https://github.com/iamahsanmehmood/saie",
+  "license": "MIT",
+  "author": {
+    "name": "Ahsan Mehmood",
+    "url": "https://github.com/iamahsanmehmood"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iamahsanmehmood/saie"
+  },
+  "transport": "stdio",
+  "install": {
+    "pip": "pip install saie",
+    "command": "saie-mcp"
+  },
+  "mcpServers": {
+    "saie": {
+      "command": "saie-mcp"
+    }
+  },
+  "requirements": {
+    "python": ">=3.10",
+    "platforms": ["windows", "darwin"],
+    "external": ["SketchUp 2025"]
+  },
+  "tags": [
+    "sketchup",
+    "architecture",
+    "cad",
+    "bim",
+    "3d",
+    "automation",
+    "design"
+  ],
+  "categories": [
+    "design",
+    "engineering",
+    "creative-tools"
+  ]
+}

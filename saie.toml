@@ -1,0 +1,120 @@
+# ============================================================================
+#  SAIE — SketchUp Automation & Intelligence Engine
+#  Central configuration file
+# ============================================================================
+#
+# This is the single source of truth for all SAIE settings. The Python MCP
+# server and the Ruby SketchUp plugin both read from this file.
+#
+# Resolution order (first hit wins):
+#   1. SAIE_CONFIG environment variable (absolute path)
+#   2. ./saie.toml in the current working directory
+#   3. ~/.saie/saie.toml  (XDG-style user config — recommended for end users)
+#   4. <repo-root>/saie.toml  (this file — bundled defaults)
+#
+# Override any value with an environment variable, e.g.
+#   SAIE_BRIDGE_PORT=9876  →  overrides [bridge].port
+#   SAIE_STREAM_PORT=9877  →  overrides [stream].port
+#
+# ============================================================================
+
+[bridge]
+# WebSocket JSON-RPC bridge between the Python MCP server and SketchUp.
+# If `port` is busy at startup, the plugin probes `port..port+port_range`
+# and writes the actual port chosen to the port_file below.
+host        = "127.0.0.1"
+port        = 9876
+port_range  = 10        # scan up to port+10 on conflict
+# Where the plugin advertises the chosen port; clients read this on connect.
+# Path is resolved relative to the user's home directory.
+port_file   = "~/.saie_port"
+# Connection timeout (seconds) for the Python client when calling SketchUp.
+timeout     = 30.0
+
+
+[stream]
+# HTTP MJPEG live-view server — runs inside the SketchUp Ruby plugin
+# and lets a human watch the SketchUp viewport in any web browser.
+enabled     = true
+port        = 9877
+port_range  = 10
+# Capture source:
+#   "window" → GetWindowDC + BitBlt (default; captures SketchUp's real
+#              framebuffer including axes, selection highlights, gizmos)
+#   "view"   → view.write_image (clean offline render; no overlays)
+source      = "window"
+# Target frame rate. Clamped to 1..30. Higher = smoother but more main-thread
+# stalls. 5–8 fps is a comfortable balance.
+fps         = 5
+# JPEG quality 1..100. Lower = smaller frames, faster network.
+quality     = 70
+# Default frame dimensions (only honoured by source = "view").
+width       = 800
+height      = 600
+# Frame-cache window in milliseconds: back-to-back consumers share a single
+# capture if requested within this window.
+cache_ms    = 100
+
+
+[sketchup]
+# SketchUp installation. Used by the installer script and by `saie` CLI to
+# locate the Plugins directory. Leave blank to auto-detect.
+version          = "2025"          # used to construct the Plugins path
+install_path     = ""              # e.g. "C:/Program Files/SketchUp/SketchUp 2025"
+plugins_path     = ""              # explicit override; if blank, derived from version
+# Auto-start the bridge when SketchUp launches. Set to false if you want to
+# start it manually from the Extensions → SAIE menu.
+autostart_bridge = true
+
+
+[projects]
+# Where `saie project create ...` puts project folders. ~ expands to home.
+root             = "~/Documents/SAIE_Projects"
+# Subfolder layout created inside every new project.
+subdirs          = ["model", "captures", "reports", "data/scan_history", "assets"]
+
+
+[capture]
+# Defaults applied by `capture_view` / `saie capture` / MCP tools when the
+# caller does not specify them.
+default_preset       = "iso"        # plan | iso | elev_n | elev_s | elev_e | elev_w
+default_resolution   = "med"        # low (640) | med (1280) | high (1920) | ultra (3840)
+default_style        = "default"    # default | hidden_line | wireframe | shaded | shaded_tex | monochrome | xray
+# Frame margin (fraction of bbox) when isolating a single entity.
+isolation_margin     = 0.15
+
+
+[agents]
+# Default AI provider for `saie agent ...`. Overridden by --provider on the CLI.
+default_provider     = "anthropic"  # anthropic | ollama
+default_anthropic_model = "claude-sonnet-4-5-20250929"
+default_ollama_model    = "gemma3:4b"
+# Ollama daemon endpoint (when default_provider = "ollama")
+ollama_host          = "http://localhost:11434"
+
+
+[logging]
+# Log level for the Ruby plugin and Python server.
+# trace | debug | info | warn | error
+level                = "info"
+# Maximum in-memory ring buffer size in the Ruby plugin (visible in dashboard).
+ring_buffer_size     = 500
+# Mirror logs to a file on disk. Empty string = disabled.
+file                 = ""           # e.g. "~/.saie/saie.log"
+
+
+[security]
+# Lock the bridge to localhost only. Setting this to false and changing
+# bridge.host to "0.0.0.0" exposes SketchUp on the network — DO NOT do this
+# unless you understand the risk: anyone on the network can mutate your model.
+localhost_only       = true
+# Optional shared secret. When set, every JSON-RPC request must include
+# `params.auth_token`. Empty string = no auth (default for localhost use).
+auth_token           = ""
+
+
+[experimental]
+# Phase-gated features. Flip these on at your own risk.
+enable_raw_ruby_exec     = true     # ops.execute_ruby tool — full Ruby eval
+enable_walkthrough_video = true     # view.walkthrough — multi-frame animations
+enable_dxf_import        = true     # parse_dxf_plan tool — 2D CAD import

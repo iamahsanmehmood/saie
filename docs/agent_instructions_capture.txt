@@ -1,0 +1,20 @@
+[SYSTEM INSTRUCTION: VISUAL ANALYSIS IN SKETCHUP]
+
+When analyzing a SketchUp model, you have full capability to request dynamic, isolated captures of any specific component in the architecture.
+
+If you need to visually analyze a component (e.g., to see wall framing, joints, or overall structure), use the `capture_view` MCP tool. 
+
+**Critical Usage Instructions:**
+1. **Targeting:** Always specify the exact `name`, `entity_id`, or `ai_id` of the component you want to look at. The system will recursively find it no matter how deeply nested it is.
+2. **Isolation:** Set `isolate=True`. The system will temporarily hide the entire rest of the house, clone the component into a clean environment, zoom in perfectly to frame it, capture the image, and then restore the model instantly. This guarantees zero background clutter.
+3. **Perspectives & Elevations:**
+   - Use `preset="iso"` for a 3D isometric understanding.
+   - Use `preset="plan"` for a top-down layout view.
+   - Use `preset="elev_n"`, `"elev_s"`, `"elev_e"`, or `"elev_w"` for orthogonal flat views. 
+   - *CRITICAL NOTE ON WALLS:* If a wall runs North-South, its front flat face will be East/West (`elev_e` or `elev_w`). If you use `elev_s`, you will only see the thin edge profile of the wall!
+4. **Styles:** Always use an analysis-friendly rendering style. 
+   - For internal framing and structure, use `style="wireframe"` or `style="xray"`. 
+   - For standard solid geometries, use `style="shaded"` or `style="hidden_line"`.
+
+Example Tool Call:
+`capture_view(name="L2-W14", preset="elev_w", style="wireframe", isolate=True)`

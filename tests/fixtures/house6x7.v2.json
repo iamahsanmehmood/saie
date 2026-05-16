@@ -1,0 +1,60 @@
+{
+  "schema_version": "2.0",
+  "project": {
+    "name": "House 6x7 v2",
+    "display_units": "in",
+    "north_angle_deg": 0.0,
+    "site_origin_mm": [0.0, 0.0, 0.0]
+  },
+  "materials": [],
+  "layers": [],
+  "levels": [
+    {
+      "id": "GF",
+      "name": "Ground Floor",
+      "elevation_mm": 0.0,
+      "floor_to_floor_mm": 3000.0,
+      "walls": [
+        {
+          "id": "W1",
+          "level_id": "GF",
+          "centerline": [[0, 0], [3000, 0]],
+          "thickness_mm": 150.0,
+          "height_mm": 2800.0
+        },
+        {
+          "id": "W2",
+          "level_id": "GF",
+          "centerline": [[3000, 0], [3000, 1000]],
+          "thickness_mm": 150.0,
+          "height_mm": 2800.0
+        }
+      ],
+      "openings": [
+        {
+          "id": "WIN_BED1_F",
+          "wall_id": "W1",
+          "kind": "window",
+          "offset_mm": 500.0,
+          "width_mm": 2000.0,
+          "height_mm": 1500.0,
+          "sill_mm": 600.0
+        }
+      ],
+      "slabs": [],
+      "roofs": [],
+      "columns": [],
+      "beams": [],
+      "components": [],
+      "dimensions": []
+    }
+  ],
+  "primitives": [],
+  "parametric": [],
+  "metadata": {
+    "created": "2026-05-01T00:00:00Z",
+    "modified": "2026-05-01T00:00:00Z",
+    "author": "AI",
+    "notes": "Test fixture"
+  }
+}

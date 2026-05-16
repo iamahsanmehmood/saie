@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"        # v1.2.3
+      - "v[0-9]+.[0-9]+.[0-9]+-*"      # v1.2.3-rc1
+
+permissions:
+  contents: write      # create GitHub Releases
+  id-token: write      # PyPI Trusted Publishing (OIDC)
+
+jobs:
+  # ─── Gate: run full CI suite first ────────────────────────────────────────
+  ci:
+    name: CI gate
+    uses: ./.github/workflows/ci.yml
+
+  # ─── Build Python wheel + sdist ───────────────────────────────────────────
+  build-python:
+    name: Build Python package
+    needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tags needed for dynamic version if ever used
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Extract version from tag
+        id: meta
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: python -m build
+
+      - name: Verify
+        run: twine check dist/*
+
+      - name: Upload Python dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
+  # ─── Build Ruby plugin zip ────────────────────────────────────────────────
+  build-ruby:
+    name: Build Ruby plugin zip
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: meta
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create plugin zip
+        run: |
+          mkdir -p dist
+          cd ruby_plugin
+          zip -r "../dist/saie-plugin-v${{ steps.meta.outputs.version }}.zip" . \
+            --exclude "*.DS_Store" \
+            --exclude "__pycache__/*" \
+            --exclude "*.pyc"
+          cd ..
+          echo "Plugin zip created:"
+          ls -lh dist/*.zip
+
+      - name: Upload Ruby plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruby-plugin
+          path: dist/saie-plugin-*.zip
+
+  # ─── Compute checksums ────────────────────────────────────────────────────
+  checksums:
+    name: Compute SHA-256 checksums
+    needs: [build-python, build-ruby]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist/
+
+      - name: Compute checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.sha256
+          echo "Checksums:"
+          cat checksums.sha256
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: dist/checksums.sha256
+
+  # ─── Publish to PyPI (Trusted Publishing) ─────────────────────────────────
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build-python, build-ruby, checksums]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/saie/
+    # Only publish on non-prerelease tags
+    if: ${{ !contains(github.ref_name, '-') }}
+    steps:
+      - name: Download Python dist
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # Trusted Publishing — no API token needed.
+        # Configure at: https://pypi.org/manage/project/saie/settings/publishing/
+        # Add: owner=iamahsanmehmood, repo=saie, workflow=release.yml, env=pypi
+
+  # ─── Create GitHub Release ────────────────────────────────────────────────
+  github-release:
+    name: Create GitHub Release
+    needs: [build-python, build-ruby, checksums]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist/
+
+      - name: Extract version
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Extract CHANGELOG entry for this version
+          awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" \
+            CHANGELOG.md > release_notes.md || echo "See CHANGELOG.md for details." > release_notes.md
+
+      - name: Determine prerelease
+        id: prerelease
+        run: |
+          if [[ "$GITHUB_REF_NAME" == *"-"* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "SAIE v${{ steps.meta.outputs.version }}"
+          body_path: release_notes.md
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/saie-plugin-*.zip
+            dist/checksums.sha256
+          fail_on_unmatched_files: false

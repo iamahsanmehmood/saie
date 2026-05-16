@@ -1,0 +1,70 @@
+# Smithery configuration — https://smithery.ai
+# Smithery auto-detects this file when the GitHub repo is connected.
+# https://smithery.ai/docs/build/project-config
+
+name: saie
+displayName: "SAIE — SketchUp Automation & Intelligence Engine"
+description: >
+  AI-powered architectural modeling for SketchUp 2025 over the Model Context
+  Protocol. Build walls, cut openings, place components, run clash detection,
+  generate walkthroughs, and inspect any entity — natively from Claude, Cursor,
+  Cline, or Antigravity. 67+ MCP tools. Includes a live HTTP MJPEG stream so
+  humans can watch the AI work in real time.
+license: MIT
+author:
+  name: Ahsan Mehmood
+  url:  https://github.com/iamahsanmehmood
+homepage:   https://github.com/iamahsanmehmood/saie
+repository: https://github.com/iamahsanmehmood/saie
+icon:       https://raw.githubusercontent.com/iamahsanmehmood/saie/main/docs/icon.png
+tags:
+  - sketchup
+  - architecture
+  - cad
+  - bim
+  - 3d
+  - design
+  - automation
+
+# Install steps shown to end users
+installation:
+  - title: "1. Install Python package"
+    command: pip install saie
+  - title: "2. Install SketchUp Ruby plugin"
+    command: saie install-plugin
+  - title: "3. Launch SketchUp 2025"
+    description: "The bridge auto-starts on ws://localhost:9876"
+
+# Transport — Smithery launches the server as a stdio subprocess
+startCommand:
+  type: stdio
+  command: saie-mcp
+  configSchema:
+    type: object
+    properties:
+      SAIE_BRIDGE_PORT:
+        type: integer
+        default: 9876
+        description: "WebSocket bridge port (override saie.toml)"
+      SAIE_STREAM_PORT:
+        type: integer
+        default: 9877
+        description: "MJPEG live-view port"
+      SAIE_AGENTS_DEFAULT_PROVIDER:
+        type: string
+        enum: [anthropic, ollama]
+        default: anthropic
+      ANTHROPIC_API_KEY:
+        type: string
+        description: "Only needed if you use saie agent with the Anthropic provider"
+        secret: true
+      OLLAMA_HOST:
+        type: string
+        default: http://localhost:11434
+
+requirements:
+  python: ">=3.10"
+  platforms: [windows, macos]
+  external:
+    - name: SketchUp 2025
+      url: https://www.sketchup.com/
