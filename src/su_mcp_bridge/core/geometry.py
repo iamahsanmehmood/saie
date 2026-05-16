@@ -10,10 +10,10 @@ All inputs/outputs are in millimetres unless explicitly suffixed `_in`.
 from __future__ import annotations
 
 import math
-from typing import List, Sequence, Tuple, Dict, Any
+from collections.abc import Sequence
+from typing import Any
 
 from .units import EPS_MM
-
 
 Point2D = Sequence[float]  # [x, y]
 Point3D = Sequence[float]  # [x, y, z]
@@ -37,7 +37,7 @@ def wall_length_mm(centerline: Sequence[Sequence[float]]) -> float:
     return math.hypot(dx, dy)
 
 
-def wall_unit_vector(centerline: Sequence[Sequence[float]]) -> Tuple[float, float]:
+def wall_unit_vector(centerline: Sequence[Sequence[float]]) -> tuple[float, float]:
     """Unit vector along the wall centerline (start -> end)."""
     length = wall_length_mm(centerline)
     if length < EPS_MM:
@@ -46,7 +46,7 @@ def wall_unit_vector(centerline: Sequence[Sequence[float]]) -> Tuple[float, floa
     return ((x2 - x1) / length, (y2 - y1) / length)
 
 
-def wall_perpendicular(centerline: Sequence[Sequence[float]]) -> Tuple[float, float]:
+def wall_perpendicular(centerline: Sequence[Sequence[float]]) -> tuple[float, float]:
     """Unit perpendicular to the wall centerline (left-handed: rotate +90 CCW).
 
     Returned vector is the "exterior" direction in plan if the centerline
@@ -56,9 +56,7 @@ def wall_perpendicular(centerline: Sequence[Sequence[float]]) -> Tuple[float, fl
     return (-uy, ux)
 
 
-def wall_axis_aligned(
-    centerline: Sequence[Sequence[float]], tolerance_deg: float = 1.0
-) -> str:
+def wall_axis_aligned(centerline: Sequence[Sequence[float]], tolerance_deg: float = 1.0) -> str:
     """Classify the wall direction.
 
     Returns one of:
@@ -116,7 +114,7 @@ def polygon_is_ccw(polygon: Sequence[Sequence[float]]) -> bool:
     return polygon_area_mm(polygon) > 0.0
 
 
-def polygon_centroid_mm(polygon: Sequence[Sequence[float]]) -> Tuple[float, float]:
+def polygon_centroid_mm(polygon: Sequence[Sequence[float]]) -> tuple[float, float]:
     """Geometric centroid (NOT vertex-mean) of a simple polygon."""
     if len(polygon) < 3:
         raise ValueError("polygon needs at least 3 points")
@@ -147,22 +145,19 @@ def point_in_polygon_mm(point: Point2D, polygon: Sequence[Sequence[float]]) -> b
     for i in range(n):
         xi, yi = polygon[i][0], polygon[i][1]
         xj, yj = polygon[j][0], polygon[j][1]
-        intersect = ((yi > y) != (yj > y)) and (
-            x < (xj - xi) * (y - yi) / (yj - yi + 1e-12) + xi
-        )
+        intersect = ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi + 1e-12) + xi)
         if intersect:
             inside = not inside
         j = i
     return inside
 
 
-def _segments_intersect(
-    a: Point2D, b: Point2D, c: Point2D, d: Point2D
-) -> bool:
+def _segments_intersect(a: Point2D, b: Point2D, c: Point2D, d: Point2D) -> bool:
     """Return True iff segment AB and segment CD properly intersect.
 
     Endpoint-coincident cases return False (we want STRICT crossing).
     """
+
     def ccw(p, q, r):
         return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
 
@@ -171,12 +166,9 @@ def _segments_intersect(
     d3 = ccw(a, b, c)
     d4 = ccw(a, b, d)
 
-    if (
-        ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0))
-        and ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0))
-    ):
-        return True
-    return False
+    return bool(
+        (d1 > 0 and d2 < 0 or d1 < 0 and d2 > 0) and (d3 > 0 and d4 < 0 or d3 < 0 and d4 > 0)
+    )
 
 
 def polygon_is_simple(polygon: Sequence[Sequence[float]]) -> bool:
@@ -196,9 +188,7 @@ def polygon_is_simple(polygon: Sequence[Sequence[float]]) -> bool:
     return True
 
 
-def points_coincident_mm(
-    p1: Point2D, p2: Point2D, tolerance_mm: float = EPS_MM
-) -> bool:
+def points_coincident_mm(p1: Point2D, p2: Point2D, tolerance_mm: float = EPS_MM) -> bool:
     """True if two points coincide within tolerance (default 1mm)."""
     dx = p1[0] - p2[0]
     dy = p1[1] - p2[1]
@@ -207,7 +197,7 @@ def points_coincident_mm(
 
 def bounding_box_mm(
     polygon: Sequence[Sequence[float]],
-) -> Tuple[float, float, float, float]:
+) -> tuple[float, float, float, float]:
     """Return (min_x, min_y, max_x, max_y) of a polygon. Empty -> all zeros."""
     if not polygon:
         return (0.0, 0.0, 0.0, 0.0)
@@ -218,16 +208,16 @@ def bounding_box_mm(
 
 def classify_junction(members: list, walls: list) -> str:
     """Classify a junction where multiple wall endpoints meet.
-    
+
     Returns one of: "end", "L", "T", "cross"
     """
     if len(members) <= 1:
         return "end"
-    
+
     # Count how many walls have this point at start vs end
-    wall_ids = set(m[1] for m in members)
+    wall_ids = {m[1] for m in members}
     n_walls = len(wall_ids)
-    
+
     if n_walls == 2:
         # Two walls meeting: check if one passes through
         for m in members:
@@ -235,9 +225,9 @@ def classify_junction(members: list, walls: list) -> str:
             idx = m[2]
             w = next(w for w in walls if w["id"] == wid)
             cl = w["centerline"]
-            other_pt = cl[1 - idx]
+            cl[1 - idx]
             # If the junction point is NOT at either end of the wall,
-            # it's a T-junction (but since we only track endpoints, 
+            # it's a T-junction (but since we only track endpoints,
             # 2-wall junctions are always L-corners)
             pass
         return "L"
@@ -250,7 +240,7 @@ def classify_junction(members: list, walls: list) -> str:
 
 def _find_through_wall(members: list, walls: list):
     """For T/cross junctions, find the wall that passes through.
-    
+
     The through wall is the longest wall. For T-junctions, it's the wall
     whose centerline the other wall(s) terminate against.
     """
@@ -265,9 +255,9 @@ def _find_through_wall(members: list, walls: list):
     return wall_objs[0], wall_objs[1:]
 
 
-def validate_wall_network(walls: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+def validate_wall_network(walls: list[dict[str, Any]]) -> list[dict[str, str]]:
     """Pre-flight check for impossible or problematic wall geometry.
-    
+
     Returns a list of warning dicts: {"wall_id": ..., "warning": ...}
     """
     warnings = []
@@ -275,46 +265,52 @@ def validate_wall_network(walls: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         cl = w["centerline"]
         length = wall_length_mm(cl)
         thick = w.get("thickness_mm", 150)
-        
+
         if length < EPS_MM:
             warnings.append({"wall_id": w["id"], "warning": "Zero-length wall"})
         elif length < thick:
-            warnings.append({"wall_id": w["id"], "warning": f"Wall length ({length:.0f}mm) shorter than thickness ({thick:.0f}mm)"})
-        
+            warnings.append(
+                {
+                    "wall_id": w["id"],
+                    "warning": f"Wall length ({length:.0f}mm) shorter than thickness ({thick:.0f}mm)",
+                }
+            )
+
         height = w.get("height_mm", 2800)
         if height <= 0:
             warnings.append({"wall_id": w["id"], "warning": "Non-positive wall height"})
-    
+
     # Check for duplicate/overlapping walls
     for i, w1 in enumerate(walls):
-        for w2 in walls[i+1:]:
+        for w2 in walls[i + 1 :]:
             cl1, cl2 = w1["centerline"], w2["centerline"]
-            if (points_coincident_mm(cl1[0], cl2[0]) and points_coincident_mm(cl1[1], cl2[1])) or \
-               (points_coincident_mm(cl1[0], cl2[1]) and points_coincident_mm(cl1[1], cl2[0])):
+            if (points_coincident_mm(cl1[0], cl2[0]) and points_coincident_mm(cl1[1], cl2[1])) or (
+                points_coincident_mm(cl1[0], cl2[1]) and points_coincident_mm(cl1[1], cl2[0])
+            ):
                 warnings.append({"wall_id": w1["id"], "warning": f"Overlaps with {w2['id']}"})
-    
+
     return warnings
 
 
-def resolve_butt_joints(walls: List[Dict[str, Any]]) -> Dict[str, List[List[float]]]:
+def resolve_butt_joints(walls: list[dict[str, Any]]) -> dict[str, list[list[float]]]:
     """Resolve wall junctions to prevent overlapping geometry.
-    
+
     Given a list of wall dictionaries (with 'id', 'centerline', 'thickness_mm'),
     finds all shared endpoints and pulls back the abutting (shorter) walls by
     half the thickness of the through (longest) wall.
-    
+
     Handles L-corners, T-junctions, and cross-junctions.
-    
+
     Returns a dictionary mapping wall 'id' to its newly adjusted centerline.
     """
     adjusted = {w["id"]: [list(w["centerline"][0]), list(w["centerline"][1])] for w in walls}
-    
+
     # Extract all endpoints
     endpoints = []
     for w in walls:
         endpoints.append((w["centerline"][0], w["id"], 0))  # 0 = start
         endpoints.append((w["centerline"][1], w["id"], 1))  # 1 = end
-        
+
     # Group coincident endpoints
     groups = []
     for ep in endpoints:
@@ -327,42 +323,42 @@ def resolve_butt_joints(walls: List[Dict[str, Any]]) -> Dict[str, List[List[floa
                 break
         if not found:
             groups.append({"pt": pt, "members": [ep]})
-            
+
     # Process each junction
     for g in groups:
         members = g["members"]
         if len(members) < 2:
             continue
-        
-        junction_type = classify_junction(members, walls)
-        
+
+        classify_junction(members, walls)
+
         # Find the through wall (longest) and abutting walls
         through_wall, abutting_walls = _find_through_wall(members, walls)
         through_thick = through_wall["thickness_mm"]
-        
+
         # Pull back each abutting wall
         for m in members:
             wid = m[1]
             if wid == through_wall["id"]:
                 continue
-                
+
             idx = m[2]
             other_idx = 1 - idx
-            
+
             w = next(w for w in walls if w["id"] == wid)
             if w.get("join_policy", "auto") == "none":
                 continue
-                
+
             P = w["centerline"][idx]
             other_P = w["centerline"][other_idx]
-            
+
             dx = other_P[0] - P[0]
             dy = other_P[1] - P[1]
             length = math.hypot(dx, dy)
             if length < EPS_MM:
                 continue
             ux, uy = dx / length, dy / length
-            
+
             # Calculate angle between abutting wall and through wall
             tw_P0 = through_wall["centerline"][0]
             tw_P1 = through_wall["centerline"][1]
@@ -372,11 +368,11 @@ def resolve_butt_joints(walls: List[Dict[str, Any]]) -> Dict[str, List[List[floa
             if tw_len < EPS_MM:
                 continue
             tw_ux, tw_uy = tw_dx / tw_len, tw_dy / tw_len
-            
+
             dot = max(-1.0, min(1.0, ux * tw_ux + uy * tw_uy))
             theta = math.acos(dot)
             sin_theta = math.sin(theta)
-            
+
             # Acute angle clamping: for angles < 30°, cap pullback
             if abs(sin_theta) < 0.17:  # < ~10 degrees (nearly parallel)
                 pullback = through_thick / 2.0
@@ -385,11 +381,11 @@ def resolve_butt_joints(walls: List[Dict[str, Any]]) -> Dict[str, List[List[floa
                 pullback = min(through_thick / 2.0 / abs(sin_theta), through_thick * 1.5)
             else:
                 pullback = (through_thick / 2.0) / abs(sin_theta)
-            
+
             # Never pull back more than 90% of the wall length
             pullback = min(pullback, length * 0.9)
-            
+
             new_P = [P[0] + ux * pullback, P[1] + uy * pullback]
             adjusted[wid][idx] = new_P
-            
+
     return adjusted

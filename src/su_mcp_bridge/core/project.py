@@ -12,21 +12,25 @@ Each project gets its own structured folder:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from .logger import get_logger
+
+if TYPE_CHECKING:
+    from .model import BuildingModel
 
 log = get_logger(__name__)
 
 _DEFAULT_BASE = os.path.join(os.path.expanduser("~"), "Documents", "SU_MCP_Projects")
 _ACTIVE_FILE = os.path.join(os.path.expanduser("~"), ".su_mcp_active_project")
-_active_project: Optional["ProjectContext"] = None
+_active_project: ProjectContext | None = None
 
 
 @dataclass
@@ -36,7 +40,7 @@ class ProjectContext:
     name: str
     root: Path
     created: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def model_dir(self) -> Path:
@@ -64,8 +68,14 @@ class ProjectContext:
 
     def ensure_dirs(self) -> None:
         """Create all subdirectories if they don't exist."""
-        for d in [self.model_dir, self.captures_dir, self.reports_dir,
-                  self.data_dir, self.data_dir / "scan_history", self.assets_dir]:
+        for d in [
+            self.model_dir,
+            self.captures_dir,
+            self.reports_dir,
+            self.data_dir,
+            self.data_dir / "scan_history",
+            self.assets_dir,
+        ]:
             d.mkdir(parents=True, exist_ok=True)
 
     def save_metadata(self) -> Path:
@@ -105,7 +115,7 @@ class ProjectContext:
         log.info(f"Snapshot saved: {dest}")
         return dest
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "root": str(self.root),
@@ -143,7 +153,7 @@ def create_project(name: str, base_dir: str = "") -> ProjectContext:
     return ctx
 
 
-def list_projects(base_dir: str = "") -> List[Dict[str, Any]]:
+def list_projects(base_dir: str = "") -> list[dict[str, Any]]:
     """List all projects in the base directory."""
     base = Path(base_dir) if base_dir else Path(_DEFAULT_BASE)
     if not base.exists():
@@ -154,20 +164,22 @@ def list_projects(base_dir: str = "") -> List[Dict[str, Any]]:
         pj = d / "project.json"
         if pj.exists():
             try:
-                with open(pj, "r", encoding="utf-8") as f:
+                with open(pj, encoding="utf-8") as f:
                     meta = json.load(f)
-                projects.append({
-                    "name": meta.get("name", d.name),
-                    "path": str(d),
-                    "created": meta.get("created", ""),
-                    "updated": meta.get("updated", ""),
-                })
+                projects.append(
+                    {
+                        "name": meta.get("name", d.name),
+                        "path": str(d),
+                        "created": meta.get("created", ""),
+                        "updated": meta.get("updated", ""),
+                    }
+                )
             except Exception:
                 projects.append({"name": d.name, "path": str(d), "created": "", "updated": ""})
     return projects
 
 
-def open_project(name: str, base_dir: str = "") -> Optional[ProjectContext]:
+def open_project(name: str, base_dir: str = "") -> ProjectContext | None:
     """Open an existing project by name (fuzzy match on folder names)."""
     base = Path(base_dir) if base_dir else Path(_DEFAULT_BASE)
     if not base.exists():
@@ -178,7 +190,7 @@ def open_project(name: str, base_dir: str = "") -> Optional[ProjectContext]:
             pj = d / "project.json"
             meta = {}
             if pj.exists():
-                with open(pj, "r", encoding="utf-8") as f:
+                with open(pj, encoding="utf-8") as f:
                     meta = json.load(f)
 
             ctx = ProjectContext(
@@ -196,22 +208,22 @@ def open_project(name: str, base_dir: str = "") -> Optional[ProjectContext]:
     return None
 
 
-def get_active_project() -> Optional[ProjectContext]:
+def get_active_project() -> ProjectContext | None:
     """Return the currently active project, or None."""
     global _active_project
     if _active_project is not None:
         return _active_project
-    
+
     if os.path.exists(_ACTIVE_FILE):
         try:
-            with open(_ACTIVE_FILE, "r", encoding="utf-8") as f:
+            with open(_ACTIVE_FILE, encoding="utf-8") as f:
                 path = f.read().strip()
             if os.path.exists(path):
                 # Load context directly from path
                 pj = Path(path) / "project.json"
                 meta = {}
                 if pj.exists():
-                    with open(pj, "r", encoding="utf-8") as f:
+                    with open(pj, encoding="utf-8") as f:
                         meta = json.load(f)
                 _active_project = ProjectContext(
                     name=meta.get("name", Path(path).name),
@@ -225,7 +237,7 @@ def get_active_project() -> Optional[ProjectContext]:
     return None
 
 
-def set_active_project(ctx: Optional[ProjectContext]) -> None:
+def set_active_project(ctx: ProjectContext | None) -> None:
     """Set the active project context."""
     global _active_project
     _active_project = ctx
@@ -239,6 +251,7 @@ def set_active_project(ctx: Optional[ProjectContext]) -> None:
 # ---------------------------------------------------------------------------
 # Project — file-locked project with BuildingModel versioning
 # ---------------------------------------------------------------------------
+
 
 class ProjectLockError(Exception):
     pass
@@ -264,7 +277,7 @@ class Project:
         self._root = root
         self._lock_path = root / self._LOCK_FILE
 
-    def __enter__(self) -> "Project":
+    def __enter__(self) -> Project:
         return self
 
     def __exit__(self, *_) -> None:
@@ -280,7 +293,7 @@ class Project:
         self._lock_path.write_text("locked", encoding="utf-8")
 
     @classmethod
-    def create(cls, root: "Path | str", model: "BuildingModel") -> "Project":  # type: ignore[name-defined]
+    def create(cls, root: Path | str, model: BuildingModel) -> Project:
         root = Path(root)
         root.mkdir(parents=True, exist_ok=True)
         for d in cls._DIRS:
@@ -291,7 +304,7 @@ class Project:
         return p
 
     @classmethod
-    def open(cls, root: "Path | str") -> "Project":
+    def open(cls, root: Path | str) -> Project:
         root = Path(root)
         if not root.exists():
             raise FileNotFoundError(f"Project not found: {root}")
@@ -299,13 +312,15 @@ class Project:
         p._acquire_lock()
         return p
 
-    def load_model(self) -> "BuildingModel":  # type: ignore[name-defined]
+    def load_model(self) -> BuildingModel:
         from .model import BuildingModel as _BM
+
         data = json.loads((self._root / self._BUILDING_FILE).read_text(encoding="utf-8"))
         return _BM.model_validate(data)
 
-    def save_model(self, model: "BuildingModel", _initial: bool = False) -> str:  # type: ignore[name-defined]
+    def save_model(self, model: BuildingModel, _initial: bool = False) -> str:
         import hashlib
+
         text = json.dumps(model.model_dump(), indent=2, ensure_ascii=False, sort_keys=True)
         sha1 = hashlib.sha1(text.encode()).hexdigest()
 
@@ -317,13 +332,11 @@ class Project:
 
         building_path.write_text(text, encoding="utf-8")
 
-        manifest: Dict[str, Any] = {}
+        manifest: dict[str, Any] = {}
         manifest_path = self._root / self._MANIFEST_FILE
         if manifest_path.exists():
-            try:
+            with contextlib.suppress(Exception):
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
         manifest["name"] = model.project.name
         manifest["model_hash"] = sha1
         manifest["updated"] = datetime.now().isoformat()
@@ -338,11 +351,12 @@ class Project:
         shutil.copy2(self._root / self._BUILDING_FILE, dest)
         return dest
 
-    def list_snapshots(self) -> List[str]:
+    def list_snapshots(self) -> list[str]:
         return sorted(s.name for s in (self._root / "snapshots").glob("*.json"))
 
-    def restore_snapshot(self, name: str) -> "BuildingModel":  # type: ignore[name-defined]
+    def restore_snapshot(self, name: str) -> BuildingModel:
         from .model import BuildingModel as _BM
+
         snap = self._root / "snapshots" / name
         if not snap.exists():
             raise FileNotFoundError(f"Snapshot not found: {name}")
@@ -358,6 +372,8 @@ class Project:
         return mem.read_text(encoding="utf-8") if mem.exists() else ""
 
 
-def empty_model(name: str) -> "BuildingModel":  # type: ignore[name-defined]
-    from .model import BuildingModel as _BM, ProjectMeta as _PM
+def empty_model(name: str) -> BuildingModel:
+    from .model import BuildingModel as _BM
+    from .model import ProjectMeta as _PM
+
     return _BM(project=_PM(name=name, display_units="mm"), levels=[])

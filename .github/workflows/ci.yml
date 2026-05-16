@@ -76,9 +76,8 @@ jobs:
 
       - name: Run unit tests
         run: pytest tests/unit/ -v --tb=short
-
-      - name: Run builder tests
-        run: pytest tests/test_builder.py tests/test_shapes.py -v --tb=short
+        # Note: tests/test_builder.py and tests/test_shapes.py are integration tests
+        # that require a live SketchUp instance and are excluded from CI.
 
   # ─── Package build check ──────────────────────────────────────────────────
   build:

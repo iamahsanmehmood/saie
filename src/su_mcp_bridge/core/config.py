@@ -28,9 +28,10 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 # Python 3.11+ ships tomllib in stdlib; fall back to tomli for 3.10.
 if sys.version_info >= (3, 11):
@@ -166,13 +167,8 @@ class SaieConfig:
             return Path(appdata) / "SketchUp" / f"SketchUp {version}" / "SketchUp" / "Plugins"
         if sys.platform == "darwin":
             return (
-                Path.home()
-                / "Library"
-                / "Application Support"
-                / "SketchUp "
-                f"{version}"
-                / "SketchUp"
-                / "Plugins"
+                Path.home() / "Library" / "Application Support" / "SketchUp "
+                f"{version}" / "SketchUp" / "Plugins"
             )
         return None  # Linux: no native SketchUp
 
@@ -260,15 +256,15 @@ def load_config(path: str | Path | None = None) -> SaieConfig:
     if chosen is not None:
         with chosen.open("rb") as f:
             data = tomllib.load(f)
-        _apply_table(cfg.bridge,        data.get("bridge", {}))
-        _apply_table(cfg.stream,        data.get("stream", {}))
-        _apply_table(cfg.sketchup,      data.get("sketchup", {}))
-        _apply_table(cfg.projects,      data.get("projects", {}))
-        _apply_table(cfg.capture,       data.get("capture", {}))
-        _apply_table(cfg.agents,        data.get("agents", {}))
-        _apply_table(cfg.logging,       data.get("logging", {}))
-        _apply_table(cfg.security,      data.get("security", {}))
-        _apply_table(cfg.experimental,  data.get("experimental", {}))
+        _apply_table(cfg.bridge, data.get("bridge", {}))
+        _apply_table(cfg.stream, data.get("stream", {}))
+        _apply_table(cfg.sketchup, data.get("sketchup", {}))
+        _apply_table(cfg.projects, data.get("projects", {}))
+        _apply_table(cfg.capture, data.get("capture", {}))
+        _apply_table(cfg.agents, data.get("agents", {}))
+        _apply_table(cfg.logging, data.get("logging", {}))
+        _apply_table(cfg.security, data.get("security", {}))
+        _apply_table(cfg.experimental, data.get("experimental", {}))
         cfg.source_path = str(chosen)
 
     _apply_env_overrides(cfg)

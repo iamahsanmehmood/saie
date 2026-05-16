@@ -80,22 +80,25 @@ plan the layout BEFORE making any tool calls, and execute precisely.
 
 # Additional tool definitions not in the base set
 EXTRA_TOOLS = [
-    {"type": "function", "function": {
-        "name": "place_component",
-        "description": "Place a door or window component into an opening. "
-                       "recipe='door' or 'window'. Use attached_to=opening_ai_id.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "recipe": {"type": "string", "description": "'door' or 'window'"},
-                "attached_to": {"type": "string", "description": "Opening ai_id to snap to"},
-                "width_mm": {"type": "number"},
-                "height_mm": {"type": "number"},
-                "thickness_mm": {"type": "number"},
+    {
+        "type": "function",
+        "function": {
+            "name": "place_component",
+            "description": "Place a door or window component into an opening. "
+            "recipe='door' or 'window'. Use attached_to=opening_ai_id.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "recipe": {"type": "string", "description": "'door' or 'window'"},
+                    "attached_to": {"type": "string", "description": "Opening ai_id to snap to"},
+                    "width_mm": {"type": "number"},
+                    "height_mm": {"type": "number"},
+                    "thickness_mm": {"type": "number"},
+                },
+                "required": ["recipe", "attached_to", "width_mm", "height_mm"],
             },
-            "required": ["recipe", "attached_to", "width_mm", "height_mm"],
         },
-    }},
+    },
 ]
 
 EXTRA_TOOL_MAP = {

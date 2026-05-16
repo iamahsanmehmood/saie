@@ -31,13 +31,13 @@ _src = os.path.join(os.path.dirname(__file__), "..", "..")
 if _src not in sys.path:
     sys.path.insert(0, os.path.abspath(_src))
 
-from su_mcp_bridge.transport.ws_client import (
-    SketchUpWSClient,
+from su_mcp_bridge.core.logger import get_logger  # noqa: E402
+from su_mcp_bridge.transport.ws_client import (  # noqa: E402
+    BridgeConnectionError,
     BridgeError,
     BridgeTimeout,
-    BridgeConnectionError,
+    SketchUpWSClient,
 )
-from su_mcp_bridge.core.logger import get_logger
 
 log = get_logger(__name__)
 
@@ -46,216 +46,276 @@ log = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 TOOLS = [
-    {"type": "function", "function": {
-        "name": "ping",
-        "description": "Test connectivity to the SketchUp bridge.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    }},
-    {"type": "function", "function": {
-        "name": "create_wall",
-        "description": "Create a wall from centerline. All units in mm.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "ai_id": {"type": "string", "description": "Unique ID like 'W1'"},
-                "centerline": {"type": "array", "description": "[[x1,y1],[x2,y2]] in mm"},
-                "thickness_mm": {"type": "number"},
-                "height_mm": {"type": "number"},
-                "level": {"type": "string"},
+    {
+        "type": "function",
+        "function": {
+            "name": "ping",
+            "description": "Test connectivity to the SketchUp bridge.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_wall",
+            "description": "Create a wall from centerline. All units in mm.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ai_id": {"type": "string", "description": "Unique ID like 'W1'"},
+                    "centerline": {"type": "array", "description": "[[x1,y1],[x2,y2]] in mm"},
+                    "thickness_mm": {"type": "number"},
+                    "height_mm": {"type": "number"},
+                    "level": {"type": "string"},
+                },
+                "required": ["ai_id", "centerline"],
             },
-            "required": ["ai_id", "centerline"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "delete_wall",
-        "description": "Delete a wall by ai_id.",
-        "parameters": {
-            "type": "object",
-            "properties": {"ai_id": {"type": "string"}},
-            "required": ["ai_id"],
-        },
-    }},
-    {"type": "function", "function": {
-        "name": "cut_opening",
-        "description": "Cut a door/window opening. sill_mm=0 for doors, ~900 for windows.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "ai_id": {"type": "string"},
-                "wall_id": {"type": "string"},
-                "offset_mm": {"type": "number"},
-                "width_mm": {"type": "number"},
-                "height_mm": {"type": "number"},
-                "sill_mm": {"type": "number"},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_wall",
+            "description": "Delete a wall by ai_id.",
+            "parameters": {
+                "type": "object",
+                "properties": {"ai_id": {"type": "string"}},
+                "required": ["ai_id"],
             },
-            "required": ["ai_id", "wall_id", "offset_mm", "width_mm", "height_mm"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "create_slab",
-        "description": "Create a floor slab from polygon in mm.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "ai_id": {"type": "string"},
-                "polygon": {"type": "array"},
-                "thickness_mm": {"type": "number"},
-                "base_z_mm": {"type": "number"},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "cut_opening",
+            "description": "Cut a door/window opening. sill_mm=0 for doors, ~900 for windows.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ai_id": {"type": "string"},
+                    "wall_id": {"type": "string"},
+                    "offset_mm": {"type": "number"},
+                    "width_mm": {"type": "number"},
+                    "height_mm": {"type": "number"},
+                    "sill_mm": {"type": "number"},
+                },
+                "required": ["ai_id", "wall_id", "offset_mm", "width_mm", "height_mm"],
             },
-            "required": ["ai_id", "polygon"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "create_roof",
-        "description": "Create a roof. Kinds: flat, shed, gable, hip.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "ai_id": {"type": "string"},
-                "footprint": {"type": "array"},
-                "kind": {"type": "string"},
-                "pitch_deg": {"type": "number"},
-                "base_z_mm": {"type": "number"},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_slab",
+            "description": "Create a floor slab from polygon in mm.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ai_id": {"type": "string"},
+                    "polygon": {"type": "array"},
+                    "thickness_mm": {"type": "number"},
+                    "base_z_mm": {"type": "number"},
+                },
+                "required": ["ai_id", "polygon"],
             },
-            "required": ["ai_id", "footprint"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "batch_operations",
-        "description": "Execute multiple ops atomically. Each: {method, params}.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "ops": {"type": "array", "items": {"type": "object"}},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_roof",
+            "description": "Create a roof. Kinds: flat, shed, gable, hip.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ai_id": {"type": "string"},
+                    "footprint": {"type": "array"},
+                    "kind": {"type": "string"},
+                    "pitch_deg": {"type": "number"},
+                    "base_z_mm": {"type": "number"},
+                },
+                "required": ["ai_id", "footprint"],
             },
-            "required": ["ops"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "clear_model",
-        "description": "Delete all entities and reset.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    }},
-    {"type": "function", "function": {
-        "name": "delete_entity",
-        "description": "Delete any entity by ai_id.",
-        "parameters": {
-            "type": "object",
-            "properties": {"ai_id": {"type": "string"}},
-            "required": ["ai_id"],
-        },
-    }},
-    {"type": "function", "function": {
-        "name": "upsert_material",
-        "description": "Create/update a material. color_hex is 'RRGGBB'.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "string"},
-                "color_hex": {"type": "string"},
-                "alpha": {"type": "number"},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "batch_operations",
+            "description": "Execute multiple ops atomically. Each: {method, params}.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ops": {"type": "array", "items": {"type": "object"}},
+                },
+                "required": ["ops"],
             },
-            "required": ["id", "color_hex"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "assign_material",
-        "description": "Assign a material to multiple entities.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "material_id": {"type": "string"},
-                "target_ids": {"type": "array", "items": {"type": "string"}},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "clear_model",
+            "description": "Delete all entities and reset.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_entity",
+            "description": "Delete any entity by ai_id.",
+            "parameters": {
+                "type": "object",
+                "properties": {"ai_id": {"type": "string"}},
+                "required": ["ai_id"],
             },
-            "required": ["material_id", "target_ids"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "scene_summary",
-        "description": "Get model summary. Call this first.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    }},
-    {"type": "function", "function": {
-        "name": "verify_model",
-        "description": "Verify expected ai_ids exist.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "expected_ids": {"type": "array", "items": {"type": "string"}},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "upsert_material",
+            "description": "Create/update a material. color_hex is 'RRGGBB'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "color_hex": {"type": "string"},
+                    "alpha": {"type": "number"},
+                },
+                "required": ["id", "color_hex"],
             },
-            "required": ["expected_ids"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "capture_view",
-        "description": "Screenshot. Presets: plan, iso, elev_n/e/s/w.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "preset": {"type": "string"},
-                "resolution": {"type": "string"},
-                "save_dir": {"type": "string"},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "assign_material",
+            "description": "Assign a material to multiple entities.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "material_id": {"type": "string"},
+                    "target_ids": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["material_id", "target_ids"],
             },
-            "required": ["preset"],
         },
-    }},
-    {"type": "function", "function": {
-        "name": "parse_dxf_plan",
-        "description": "Parse a DXF file to extract wall centerlines.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "filepath": {"type": "string"},
-                "layer_name": {"type": "string"},
-                "default_thickness_mm": {"type": "number"},
-                "default_height_mm": {"type": "number"},
-                "scale_factor": {"type": "number"},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scene_summary",
+            "description": "Get model summary. Call this first.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "verify_model",
+            "description": "Verify expected ai_ids exist.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expected_ids": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["expected_ids"],
             },
-            "required": ["filepath"],
         },
-    }},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "capture_view",
+            "description": "Screenshot. Presets: plan, iso, elev_n/e/s/w.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "preset": {"type": "string"},
+                    "resolution": {"type": "string"},
+                    "save_dir": {"type": "string"},
+                },
+                "required": ["preset"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "parse_dxf_plan",
+            "description": "Parse a DXF file to extract wall centerlines.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filepath": {"type": "string"},
+                    "layer_name": {"type": "string"},
+                    "default_thickness_mm": {"type": "number"},
+                    "default_height_mm": {"type": "number"},
+                    "scale_factor": {"type": "number"},
+                },
+                "required": ["filepath"],
+            },
+        },
+    },
     # -- v3.0 tools --
-    {"type": "function", "function": {
-        "name": "deep_scan",
-        "description": "Comprehensive model scan returning all entities with metadata.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    }},
-    {"type": "function", "function": {
-        "name": "detect_clashes",
-        "description": "Detect geometric clashes between tracked entities.",
-        "parameters": {
-            "type": "object",
-            "properties": {"tolerance_mm": {"type": "number"}},
-            "required": [],
+    {
+        "type": "function",
+        "function": {
+            "name": "deep_scan",
+            "description": "Comprehensive model scan returning all entities with metadata.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
         },
-    }},
-    {"type": "function", "function": {
-        "name": "save_file",
-        "description": "Save the SketchUp model.",
-        "parameters": {
-            "type": "object",
-            "properties": {"path": {"type": "string"}},
-            "required": [],
-        },
-    }},
-    {"type": "function", "function": {
-        "name": "model_info",
-        "description": "Get model metadata.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    }},
-    {"type": "function", "function": {
-        "name": "generate_walkthrough",
-        "description": "Generate camera walkthrough video. Presets: orbit, flythrough, cinematic.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "preset": {"type": "string"},
-                "frames": {"type": "integer"},
-                "fps": {"type": "integer"},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "detect_clashes",
+            "description": "Detect geometric clashes between tracked entities.",
+            "parameters": {
+                "type": "object",
+                "properties": {"tolerance_mm": {"type": "number"}},
+                "required": [],
             },
-            "required": [],
         },
-    }},
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_file",
+            "description": "Save the SketchUp model.",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "model_info",
+            "description": "Get model metadata.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_walkthrough",
+            "description": "Generate camera walkthrough video. Presets: orbit, flythrough, cinematic.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "preset": {"type": "string"},
+                    "frames": {"type": "integer"},
+                    "fps": {"type": "integer"},
+                },
+                "required": [],
+            },
+        },
+    },
 ]
 
 # Map tool names -> JSON-RPC method names
@@ -287,9 +347,12 @@ _TOOL_TO_METHOD: dict[str, str] = {
 try:
     from su_mcp_bridge.api_agent.architect_prompt import (
         ARCHITECT_SYSTEM_PROMPT as SYSTEM_PROMPT,
-        EXTRA_TOOLS,
-        EXTRA_TOOL_MAP,
     )
+    from su_mcp_bridge.api_agent.architect_prompt import (
+        EXTRA_TOOL_MAP,
+        EXTRA_TOOLS,
+    )
+
     TOOLS.extend(EXTRA_TOOLS)
     _TOOL_TO_METHOD.update(EXTRA_TOOL_MAP)
 except ImportError:
@@ -327,9 +390,7 @@ class OllamaAgent:
         self.verbose = verbose
 
         self._bridge = SketchUpWSClient(host=host, port=port, timeout=30)
-        self.messages: list[dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT}
-        ]
+        self.messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     def _ensure_bridge(self) -> None:
         if not self._bridge.is_connected:
@@ -348,6 +409,7 @@ class OllamaAgent:
             if method.startswith("local."):
                 if method == "local.parse_dxf_plan":
                     from su_mcp_bridge.parser.dxf import parse_dxf_walls
+
                     walls = parse_dxf_walls(
                         filepath=tool_input["filepath"],
                         layer_name=tool_input.get("layer_name"),
@@ -355,7 +417,9 @@ class OllamaAgent:
                         default_height_mm=tool_input.get("default_height_mm", 2500.0),
                         scale_factor=tool_input.get("scale_factor", 1.0),
                     )
-                    return json.dumps({"status": "parsed", "wall_count": len(walls), "walls": walls}, indent=2)
+                    return json.dumps(
+                        {"status": "parsed", "wall_count": len(walls), "walls": walls}, indent=2
+                    )
                 return json.dumps({"error": f"Unknown local method {method}"})
 
             result = self._bridge.send_request(method, tool_input)
@@ -374,13 +438,13 @@ class OllamaAgent:
         self.messages.append({"role": "user", "content": user_message})
 
         if self.verbose:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"  User: {user_message[:80]}{'...' if len(user_message) > 80 else ''}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
         final_text = ""
 
-        for turn in range(self.max_turns):
+        for _turn in range(self.max_turns):
             try:
                 response = self.client.chat.completions.create(
                     model=self.model,
@@ -402,7 +466,9 @@ class OllamaAgent:
                 final_text = msg.content or ""
                 self.messages.append({"role": "assistant", "content": final_text})
                 if self.verbose:
-                    print(f"\n[assistant] {final_text[:300]}{'...' if len(final_text) > 300 else ''}")
+                    print(
+                        f"\n[assistant] {final_text[:300]}{'...' if len(final_text) > 300 else ''}"
+                    )
                 break
 
             # Process tool calls
@@ -427,16 +493,17 @@ class OllamaAgent:
                     preview = result_str[:120] + "..." if len(result_str) > 120 else result_str
                     print(f"         -> {preview}")
 
-                self.messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": result_str,
-                })
+                self.messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": result_str,
+                    }
+                )
 
             # Check if we also had text content alongside tool calls
-            if msg.content:
-                if self.verbose:
-                    print(f"  [thinking] {msg.content[:100]}")
+            if msg.content and self.verbose:
+                print(f"  [thinking] {msg.content[:100]}")
         else:
             if self.verbose:
                 print(f"  [warning] Hit max_turns ({self.max_turns})")

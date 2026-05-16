@@ -44,6 +44,7 @@ if _src not in sys.path:
 def _get_client():
     """Lazy-import and return a connected bridge client."""
     from su_mcp_bridge.transport.ws_client import SketchUpWSClient
+
     host = os.environ.get("SKETCHUP_HOST", "localhost")
     port_env = os.environ.get("SKETCHUP_PORT")
     port = int(port_env) if port_env else None
@@ -61,6 +62,7 @@ def _print_json(data):
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
+
 
 def cmd_ping(_args):
     """Test bridge connectivity."""
@@ -85,7 +87,7 @@ def cmd_status(_args):
         summary = client.send_request("query.scene_summary")
         client.disconnect()
 
-        print(f"Bridge:     connected")
+        print("Bridge:     connected")
         print(f"Plugin:     v{hello.get('plugin_version', '?')}")
         print(f"Protocol:   v{hello.get('protocol_version', '?')}")
         print(f"Methods:    {len(hello.get('capabilities', []))}")
@@ -147,6 +149,7 @@ def cmd_capture(args):
         params["save_dir"] = args.save_dir
     else:
         from su_mcp_bridge.core.project import get_active_project
+
         project = get_active_project()
         if project:
             params["project_captures_dir"] = str(project.captures_dir)
@@ -166,6 +169,7 @@ def cmd_capture_all(args):
         params["save_dir"] = args.save_dir
     else:
         from su_mcp_bridge.core.project import get_active_project
+
         project = get_active_project()
         if project:
             params["project_captures_dir"] = str(project.captures_dir)
@@ -184,17 +188,19 @@ def cmd_agent(args):
 
     if provider == "ollama":
         from su_mcp_bridge.api_agent.ollama_agent import OllamaAgent
+
         model = args.model or "qwen2.5:7b"
         print(f"Using Ollama ({model}) — no API key needed")
         agent = OllamaAgent(model=model, verbose=True)
     else:
         from su_mcp_bridge.api_agent.agent import BuilderAgent
+
         try:
             agent = BuilderAgent(
                 model=args.model or "claude-sonnet-4-20250514",
                 verbose=True,
             )
-        except EnvironmentError as e:
+        except OSError as e:
             print(f"ERROR: {e}")
             print("Tip: Use --provider ollama to use a local model instead.")
             sys.exit(1)
@@ -234,6 +240,7 @@ def cmd_agent(args):
 def cmd_mcp(_args):
     """Start the MCP server."""
     from su_mcp_bridge.mcp_server.server import mcp
+
     print("Starting MCP server (stdio)...", file=sys.stderr)
     mcp.run(transport="stdio")
 
@@ -241,6 +248,7 @@ def cmd_mcp(_args):
 # ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -267,8 +275,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     # capture
     p_cap = sub.add_parser("capture", help="Capture a view")
-    p_cap.add_argument("preset", nargs="?", default="iso",
-                        choices=["plan", "iso", "elev_n", "elev_e", "elev_s", "elev_w"])
+    p_cap.add_argument(
+        "preset",
+        nargs="?",
+        default="iso",
+        choices=["plan", "iso", "elev_n", "elev_e", "elev_s", "elev_w"],
+    )
     p_cap.add_argument("--resolution", "-r", default="med", choices=["low", "med", "high"])
     p_cap.add_argument("--save-dir", "-d", default="")
 
@@ -281,9 +293,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_agent = sub.add_parser("agent", help="Start the AI agent")
     p_agent.add_argument("prompt", nargs="*", help="Prompt (omit for interactive REPL)")
     p_agent.add_argument("--model", "-m", default=None)
-    p_agent.add_argument("--provider", "-p", default="anthropic",
-                          choices=["anthropic", "ollama"],
-                          help="LLM provider (default: anthropic, use ollama for local)")
+    p_agent.add_argument(
+        "--provider",
+        "-p",
+        default="anthropic",
+        choices=["anthropic", "ollama"],
+        help="LLM provider (default: anthropic, use ollama for local)",
+    )
 
     # mcp
     sub.add_parser("mcp", help="Start the MCP server (stdio)")
@@ -320,8 +336,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     # walkthrough
     p_walk = sub.add_parser("walkthrough", help="Generate a walkthrough video")
-    p_walk.add_argument("preset", nargs="?", default="orbit",
-                         choices=["orbit", "flythrough", "cinematic"])
+    p_walk.add_argument(
+        "preset", nargs="?", default="orbit", choices=["orbit", "flythrough", "cinematic"]
+    )
     p_walk.add_argument("--frames", type=int, default=120)
     p_walk.add_argument("--fps", type=int, default=30)
     p_walk.add_argument("--resolution", "-r", default="med", choices=["low", "med", "high"])
@@ -329,10 +346,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     # render
     p_rend = sub.add_parser("render", help="Capture a high-quality render (ultra resolution)")
-    p_rend.add_argument("preset", nargs="?", default="iso",
-                         choices=["plan", "iso", "elev_n", "elev_e", "elev_s", "elev_w"])
+    p_rend.add_argument(
+        "preset",
+        nargs="?",
+        default="iso",
+        choices=["plan", "iso", "elev_n", "elev_e", "elev_s", "elev_w"],
+    )
     p_rend.add_argument("--save-dir", "-d", default="")
-    p_rend.add_argument("--style", "-s", choices=["default", "hidden_line", "wireframe", "shaded", "shaded_tex", "monochrome", "xray"], help="Apply a SketchUp rendering style")
+    p_rend.add_argument(
+        "--style",
+        "-s",
+        choices=[
+            "default",
+            "hidden_line",
+            "wireframe",
+            "shaded",
+            "shaded_tex",
+            "monochrome",
+            "xray",
+        ],
+        help="Apply a SketchUp rendering style",
+    )
 
     # sketchup lifecycle
     p_su = sub.add_parser("sketchup", help="SketchUp lifecycle (start/stop/restart)")
@@ -341,14 +375,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     # house
     p_house = sub.add_parser("house", help="Generate a house from a prompt or config")
-    p_house.add_argument("prompt", nargs="*", help="Natural language description (uses AI to parse)")
+    p_house.add_argument(
+        "prompt", nargs="*", help="Natural language description (uses AI to parse)"
+    )
     p_house.add_argument("--bedrooms", "-b", type=int, default=None, help="Number of bedrooms")
     p_house.add_argument("--bathrooms", type=int, default=None)
     p_house.add_argument("--garage", action="store_true", default=False)
     p_house.add_argument("--roof", choices=["hip", "gable", "flat", "shed"], default=None)
     p_house.add_argument("--style", choices=["modern", "classic", "minimal"], default=None)
-    p_house.add_argument("--model", "-m", default="gemma4:e2b", help="Ollama model for prompt parsing")
-    p_house.add_argument("--render", action="store_true", default=False, help="Take ISO render after building")
+    p_house.add_argument(
+        "--model", "-m", default="gemma4:e2b", help="Ollama model for prompt parsing"
+    )
+    p_house.add_argument(
+        "--render", action="store_true", default=False, help="Take ISO render after building"
+    )
 
     # undo
     sub.add_parser("undo", help="Trigger SketchUp undo")
@@ -362,9 +402,9 @@ def cmd_scan(_args):
     result = client.send_request("query.deep_scan")
     summary = result.get("summary", {})
     entities = result.get("entities", [])
-    definitions = result.get("definitions", [])
+    result.get("definitions", [])
 
-    print(f"Deep Scan Complete")
+    print("Deep Scan Complete")
     print(f"  Entities:    {summary.get('total_entities', 0)}")
     print(f"  Faces:       {summary.get('total_faces', 0)}")
     print(f"  Edges:       {summary.get('total_edges', 0)}")
@@ -375,10 +415,12 @@ def cmd_scan(_args):
 
     if entities:
         print(f"  {'AI ID':<20s} {'Type':<12s} {'Layer':<10s} {'Material':<15s} {'Solid':<6s}")
-        print(f"  {'-'*20} {'-'*12} {'-'*10} {'-'*15} {'-'*6}")
+        print(f"  {'-' * 20} {'-' * 12} {'-' * 10} {'-' * 15} {'-' * 6}")
         for e in entities:
             solid = "Yes" if e.get("is_solid") else "No"
-            print(f"  {e.get('ai_id','?'):<20s} {e.get('type','?'):<12s} {e.get('layer','-'):<10s} {e.get('material','-') or '-':<15s} {solid:<6s}")
+            print(
+                f"  {e.get('ai_id', '?'):<20s} {e.get('type', '?'):<12s} {e.get('layer', '-'):<10s} {e.get('material', '-') or '-':<15s} {solid:<6s}"
+            )
     client.disconnect()
 
 
@@ -389,7 +431,11 @@ def cmd_report(args):
     scan_data = client.send_request("query.deep_scan")
     client.disconnect()
 
-    from su_mcp_bridge.core.report import generate_model_report, generate_csv_inventory, generate_json_snapshot
+    from su_mcp_bridge.core.report import (
+        generate_csv_inventory,
+        generate_json_snapshot,
+        generate_model_report,
+    )
 
     if fmt == "csv":
         path = generate_csv_inventory(scan_data, args.output or "")
@@ -408,6 +454,7 @@ def cmd_save(args):
         params["path"] = args.path
     else:
         from su_mcp_bridge.core.project import get_active_project
+
         project = get_active_project()
         if project:
             auto_path = str(project.model_dir / f"{project.name.replace(' ', '_')}.skp")
@@ -453,7 +500,12 @@ def cmd_clash(_args):
 
 def cmd_project(args):
     """Project management."""
-    from su_mcp_bridge.core.project import create_project, list_projects, open_project, get_active_project
+    from su_mcp_bridge.core.project import (
+        create_project,
+        get_active_project,
+        list_projects,
+        open_project,
+    )
 
     action = args.action
     if action == "create":
@@ -513,14 +565,16 @@ def cmd_walkthrough(args):
         params["save_dir"] = args.save_dir
     else:
         from su_mcp_bridge.core.project import get_active_project
+
         project = get_active_project()
         if project:
             import os
+
             # Use project assets dir, but append /walkthrough/preset
             save_dir = os.path.join(str(project.assets_dir), f"walkthrough_{preset}")
             os.makedirs(save_dir, exist_ok=True)
             params["save_dir"] = save_dir
-            
+
     print(f"Generating {preset} walkthrough ({args.frames} frames)...")
     result = client.send_request("view.walkthrough", params)
     client.disconnect()
@@ -545,6 +599,7 @@ def cmd_render(args):
         params["save_dir"] = args.save_dir
     else:
         from su_mcp_bridge.core.project import get_active_project
+
         project = get_active_project()
         if project:
             params["project_assets_dir"] = str(project.assets_dir)
@@ -559,7 +614,7 @@ def cmd_render(args):
 
 def cmd_sketchup(args):
     """SketchUp lifecycle management."""
-    from su_mcp_bridge.core.lifecycle import start_sketchup, close_sketchup, restart_sketchup
+    from su_mcp_bridge.core.lifecycle import close_sketchup, restart_sketchup, start_sketchup
 
     action = args.action
     if action == "start":
@@ -586,11 +641,10 @@ def cmd_undo(_args):
     """Trigger SketchUp undo."""
     client = _get_client()
     # SketchUp Undo via send_action
-    result = client.send_request("lifecycle.model_info")  # Verify connection first
-    import subprocess
+    client.send_request("lifecycle.model_info")  # Verify connection first
     # Use Sketchup.send_action via a simple eval
     try:
-        eval_result = client.send_request("eval", {"code": "Sketchup.send_action('editUndo:')"})
+        client.send_request("eval", {"code": "Sketchup.send_action('editUndo:')"})
         print("Undo triggered")
     except Exception:
         print("Undo: sent (no confirmation available)")
@@ -616,7 +670,7 @@ def cmd_house(args):
     # If a prompt is provided (and no direct flags), use Ollama to parse intent
     if args.prompt and not config:
         prompt_text = " ".join(args.prompt)
-        print(f"Parsing: \"{prompt_text}\"")
+        print(f'Parsing: "{prompt_text}"')
         print(f"Using {args.model} for intent parsing...")
         config = _parse_house_prompt(prompt_text, args.model)
         print(f"Parsed config: {json.dumps(config, indent=2)}")
@@ -627,14 +681,16 @@ def cmd_house(args):
     # Build
     client = _get_client()
     from su_mcp_bridge.core.house_generator import HouseGenerator
+
     gen = HouseGenerator(client)
-    result = gen.build(config)
+    gen.build(config)
 
     # Optional render
     if args.render:
         print("Taking ISO render...")
         params = {"preset": "iso", "resolution": "high"}
         from su_mcp_bridge.core.project import get_active_project
+
         project = get_active_project()
         if project:
             params["project_assets_dir"] = str(project.assets_dir)
@@ -648,21 +704,25 @@ def _parse_house_prompt(prompt: str, model: str) -> dict:
     """Use a small Ollama model to extract house config from natural language."""
     try:
         from openai import OpenAI
+
         ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
         client = OpenAI(base_url=f"{ollama_host}/v1", api_key="ollama")
 
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": (
-                    "Extract house parameters from the user's description. "
-                    "Return ONLY a JSON object with these optional keys: "
-                    "bedrooms (int 1-5), bathrooms (int 1-3), "
-                    "has_garage (bool), has_porch (bool), "
-                    "roof_kind (hip/gable/flat/shed), "
-                    "style (modern/classic/minimal). "
-                    "Return ONLY valid JSON, no markdown, no explanation."
-                )},
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract house parameters from the user's description. "
+                        "Return ONLY a JSON object with these optional keys: "
+                        "bedrooms (int 1-5), bathrooms (int 1-3), "
+                        "has_garage (bool), has_porch (bool), "
+                        "roof_kind (hip/gable/flat/shed), "
+                        "style (modern/classic/minimal). "
+                        "Return ONLY valid JSON, no markdown, no explanation."
+                    ),
+                },
                 {"role": "user", "content": prompt},
             ],
             temperature=0.1,

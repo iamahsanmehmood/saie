@@ -9,9 +9,9 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from .geometry import wall_length_mm, points_coincident_mm
+from .geometry import wall_length_mm
 from .logger import get_logger
 from .project import get_active_project
 
@@ -31,10 +31,11 @@ SEVERITY_INFO = "info"
 # Clash result
 # ---------------------------------------------------------------------------
 
+
 class ClashResult:
     """A single clash finding."""
-    def __init__(self, entity_a: str, entity_b: str, rule: str,
-                 severity: str, message: str):
+
+    def __init__(self, entity_a: str, entity_b: str, rule: str, severity: str, message: str):
         self.entity_a = entity_a
         self.entity_b = entity_b
         self.rule = rule
@@ -53,8 +54,9 @@ class ClashResult:
 
 class ClashReport:
     """Collection of clash results with summary."""
+
     def __init__(self):
-        self.findings: List[ClashResult] = []
+        self.findings: list[ClashResult] = []
 
     def add(self, finding: ClashResult):
         self.findings.append(finding)
@@ -90,7 +92,8 @@ class ClashReport:
 # Rule checks
 # ---------------------------------------------------------------------------
 
-def _check_wall_wall_overlap(entities: List[Dict]) -> List[ClashResult]:
+
+def _check_wall_wall_overlap(entities: list[dict]) -> list[ClashResult]:
     """Rule: Two walls with overlapping bounding boxes (not at joints)."""
     results = []
     walls = [e for e in entities if e.get("type") == "wall"]
@@ -100,16 +103,20 @@ def _check_wall_wall_overlap(entities: List[Dict]) -> List[ClashResult]:
         min1 = bb1.get("min", [0, 0, 0])
         max1 = bb1.get("max", [0, 0, 0])
 
-        for w2 in walls[i + 1:]:
+        for w2 in walls[i + 1 :]:
             bb2 = w2.get("bounds_mm", {})
             min2 = bb2.get("min", [0, 0, 0])
             max2 = bb2.get("max", [0, 0, 0])
 
             # Check 3-axis AABB overlap
-            if (min1[0] < max2[0] and max1[0] > min2[0] and
-                min1[1] < max2[1] and max1[1] > min2[1] and
-                min1[2] < max2[2] and max1[2] > min2[2]):
-
+            if (
+                min1[0] < max2[0]
+                and max1[0] > min2[0]
+                and min1[1] < max2[1]
+                and max1[1] > min2[1]
+                and min1[2] < max2[2]
+                and max1[2] > min2[2]
+            ):
                 # Calculate overlap volume
                 dx = max(0, min(max1[0], max2[0]) - max(min1[0], min2[0]))
                 dy = max(0, min(max1[1], max2[1]) - max(min1[1], min2[1]))
@@ -117,16 +124,19 @@ def _check_wall_wall_overlap(entities: List[Dict]) -> List[ClashResult]:
                 vol = dx * dy * dz
 
                 if vol > 1000:  # > 1cm³
-                    results.append(ClashResult(
-                        w1.get("ai_id", "?"), w2.get("ai_id", "?"),
-                        "wall_wall_overlap",
-                        SEVERITY_ERROR,
-                        f"Wall-wall overlap: {vol:.0f} mm³"
-                    ))
+                    results.append(
+                        ClashResult(
+                            w1.get("ai_id", "?"),
+                            w2.get("ai_id", "?"),
+                            "wall_wall_overlap",
+                            SEVERITY_ERROR,
+                            f"Wall-wall overlap: {vol:.0f} mm³",
+                        )
+                    )
     return results
 
 
-def _check_opening_bounds(entities: List[Dict]) -> List[ClashResult]:
+def _check_opening_bounds(entities: list[dict]) -> list[ClashResult]:
     """Rule: Opening exceeds wall bounds."""
     results = []
     walls = {e["ai_id"]: e for e in entities if e.get("type") == "wall" and e.get("ai_id")}
@@ -155,24 +165,30 @@ def _check_opening_bounds(entities: List[Dict]) -> List[ClashResult]:
             op_id = op.get("ai_id", "?")
 
             if offset + width > wlen + 1:  # 1mm tolerance
-                results.append(ClashResult(
-                    op_id, wall_id,
-                    "opening_exceeds_wall_length",
-                    SEVERITY_ERROR,
-                    f"Opening extends past wall: offset({offset}) + width({width}) = {offset + width:.0f} > wall length {wlen:.0f}"
-                ))
+                results.append(
+                    ClashResult(
+                        op_id,
+                        wall_id,
+                        "opening_exceeds_wall_length",
+                        SEVERITY_ERROR,
+                        f"Opening extends past wall: offset({offset}) + width({width}) = {offset + width:.0f} > wall length {wlen:.0f}",
+                    )
+                )
 
             if sill + op_height > height_mm + 1:
-                results.append(ClashResult(
-                    op_id, wall_id,
-                    "opening_exceeds_wall_height",
-                    SEVERITY_ERROR,
-                    f"Opening exceeds wall height: sill({sill}) + height({op_height}) = {sill + op_height} > {height_mm}"
-                ))
+                results.append(
+                    ClashResult(
+                        op_id,
+                        wall_id,
+                        "opening_exceeds_wall_height",
+                        SEVERITY_ERROR,
+                        f"Opening exceeds wall height: sill({sill}) + height({op_height}) = {sill + op_height} > {height_mm}",
+                    )
+                )
     return results
 
 
-def _check_slab_wall_z_overlap(entities: List[Dict]) -> List[ClashResult]:
+def _check_slab_wall_z_overlap(entities: list[dict]) -> list[ClashResult]:
     """Rule: Slab and wall z-axis overlap (slab should sit below walls, not through them)."""
     results = []
     walls = [e for e in entities if e.get("type") == "wall"]
@@ -192,16 +208,19 @@ def _check_slab_wall_z_overlap(entities: List[Dict]) -> List[ClashResult]:
             # Slab significantly overlaps wall vertically (not just touching)
             overlap_z = min(s_max_z, w_max_z) - max(s_min_z, w_min_z)
             if overlap_z > slab_thick * 0.5 and overlap_z > 50:  # > 50mm
-                results.append(ClashResult(
-                    slab.get("ai_id", "?"), wall.get("ai_id", "?"),
-                    "slab_wall_z_overlap",
-                    SEVERITY_WARNING,
-                    f"Slab-wall Z overlap: {overlap_z:.0f}mm"
-                ))
+                results.append(
+                    ClashResult(
+                        slab.get("ai_id", "?"),
+                        wall.get("ai_id", "?"),
+                        "slab_wall_z_overlap",
+                        SEVERITY_WARNING,
+                        f"Slab-wall Z overlap: {overlap_z:.0f}mm",
+                    )
+                )
     return results
 
 
-def _check_component_collision(entities: List[Dict]) -> List[ClashResult]:
+def _check_component_collision(entities: list[dict]) -> list[ClashResult]:
     """Rule: Component-component AABB collision."""
     results = []
     components = [e for e in entities if e.get("type") in ("component", "primitive")]
@@ -211,20 +230,28 @@ def _check_component_collision(entities: List[Dict]) -> List[ClashResult]:
         min1 = bb1.get("min", [0, 0, 0])
         max1 = bb1.get("max", [0, 0, 0])
 
-        for c2 in components[i + 1:]:
+        for c2 in components[i + 1 :]:
             bb2 = c2.get("bounds_mm", {})
             min2 = bb2.get("min", [0, 0, 0])
             max2 = bb2.get("max", [0, 0, 0])
 
-            if (min1[0] < max2[0] and max1[0] > min2[0] and
-                min1[1] < max2[1] and max1[1] > min2[1] and
-                min1[2] < max2[2] and max1[2] > min2[2]):
-                results.append(ClashResult(
-                    c1.get("ai_id", "?"), c2.get("ai_id", "?"),
-                    "component_collision",
-                    SEVERITY_WARNING,
-                    "Component bounding boxes overlap"
-                ))
+            if (
+                min1[0] < max2[0]
+                and max1[0] > min2[0]
+                and min1[1] < max2[1]
+                and max1[1] > min2[1]
+                and min1[2] < max2[2]
+                and max1[2] > min2[2]
+            ):
+                results.append(
+                    ClashResult(
+                        c1.get("ai_id", "?"),
+                        c2.get("ai_id", "?"),
+                        "component_collision",
+                        SEVERITY_WARNING,
+                        "Component bounding boxes overlap",
+                    )
+                )
     return results
 
 
@@ -232,12 +259,13 @@ def _check_component_collision(entities: List[Dict]) -> List[ClashResult]:
 # Main analyzer
 # ---------------------------------------------------------------------------
 
-def analyze_clashes(scan_data: Dict[str, Any]) -> ClashReport:
+
+def analyze_clashes(scan_data: dict[str, Any]) -> ClashReport:
     """Run all clash rules against deep scan data.
-    
+
     Args:
         scan_data: Output from query.deep_scan
-    
+
     Returns:
         ClashReport with all findings
     """
@@ -253,8 +281,10 @@ def analyze_clashes(scan_data: Dict[str, Any]) -> ClashReport:
         for finding in check(entities):
             report.add(finding)
 
-    log.info(f"Clash analysis: {len(report.findings)} findings "
-             f"({report.error_count} errors, {report.warning_count} warnings)")
+    log.info(
+        f"Clash analysis: {len(report.findings)} findings "
+        f"({report.error_count} errors, {report.warning_count} warnings)"
+    )
     return report
 
 
@@ -288,7 +318,9 @@ def generate_clash_report_md(report: ClashReport, output_dir: str = "") -> Path:
         lines.append("|----------|----------|----------|------|---------|")
         for f in report.findings:
             sev_icon = {"error": "🔴", "warning": "🟡", "info": "🔵"}.get(f.severity, "⚪")
-            lines.append(f"| {sev_icon} {f.severity} | {f.entity_a} | {f.entity_b} | {f.rule} | {f.message} |")
+            lines.append(
+                f"| {sev_icon} {f.severity} | {f.entity_a} | {f.entity_b} | {f.rule} | {f.message} |"
+            )
         lines.append("")
     else:
         lines.append("No clashes detected. Model geometry is clean.")

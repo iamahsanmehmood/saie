@@ -11,12 +11,12 @@ clever about compaction or rotation — disk is cheap, debugging isn't.
 from __future__ import annotations
 
 import json
-import os
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any
 
 from .logger import get_logger
 
@@ -30,20 +30,20 @@ class OpRecord:
     op_id: str
     ts: float  # epoch seconds, with fractional precision
     kind: str  # e.g. "WallCreated", "OpeningModified", "BatchApplied"
-    entity_id: Optional[str] = None
-    payload: Dict[str, Any] = field(default_factory=dict)
-    inverse: Dict[str, Any] = field(default_factory=dict)  # the op that undoes this
-    label: Optional[str] = None  # human-readable summary for `history.list`
+    entity_id: str | None = None
+    payload: dict[str, Any] = field(default_factory=dict)
+    inverse: dict[str, Any] = field(default_factory=dict)  # the op that undoes this
+    label: str | None = None  # human-readable summary for `history.list`
 
     @classmethod
     def new(
         cls,
         kind: str,
-        entity_id: Optional[str] = None,
-        payload: Optional[Dict[str, Any]] = None,
-        inverse: Optional[Dict[str, Any]] = None,
-        label: Optional[str] = None,
-    ) -> "OpRecord":
+        entity_id: str | None = None,
+        payload: dict[str, Any] | None = None,
+        inverse: dict[str, Any] | None = None,
+        label: str | None = None,
+    ) -> OpRecord:
         return cls(
             op_id=str(uuid.uuid4()),
             ts=time.time(),
@@ -58,7 +58,7 @@ class OpRecord:
         return json.dumps(asdict(self), separators=(",", ":")) + "\n"
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "OpRecord":
+    def from_dict(cls, d: dict[str, Any]) -> OpRecord:
         return cls(
             op_id=d["op_id"],
             ts=d["ts"],
@@ -109,7 +109,7 @@ class History:
                 except (json.JSONDecodeError, KeyError) as e:
                     log.warning("history: skipping malformed line: %s", e)
 
-    def list_recent(self, limit: int = 20) -> List[OpRecord]:
+    def list_recent(self, limit: int = 20) -> list[OpRecord]:
         """Last N records, newest first. For `history.list` tool."""
         all_records = list(self.iter_records())
         return list(reversed(all_records[-limit:]))

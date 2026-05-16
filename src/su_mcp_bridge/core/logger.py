@@ -15,7 +15,6 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import Optional
 
 _DEFAULT_FORMAT = "%(asctime)s %(levelname)-7s [%(name)s] %(message)s"
 _TIME_FORMAT = "%H:%M:%S"
@@ -34,7 +33,9 @@ def _initialize_root() -> None:
         _initialized = True
         return
 
-    level_name = os.environ.get("SU_MCP_BRIDGE_LOG", os.environ.get("SKETCHUP_AI_LOG", "INFO")).upper()
+    level_name = os.environ.get(
+        "SU_MCP_BRIDGE_LOG", os.environ.get("SKETCHUP_AI_LOG", "INFO")
+    ).upper()
     level = getattr(logging, level_name, logging.INFO)
 
     handler = logging.StreamHandler(stream=sys.stderr)
@@ -45,7 +46,7 @@ def _initialize_root() -> None:
     _initialized = True
 
 
-def get_logger(name: Optional[str] = None) -> logging.Logger:
+def get_logger(name: str | None = None) -> logging.Logger:
     """Return a logger under the `su_mcp_bridge` namespace.
 
     `name` is typically `__name__`. If it does not start with `su_mcp_bridge`,

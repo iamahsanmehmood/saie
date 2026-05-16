@@ -21,12 +21,11 @@ Configuration in claude_desktop_config.json:
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
 from typing import Any
-
-import base64
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.utilities.types import Image as MCPImage
@@ -36,13 +35,13 @@ _src = os.path.join(os.path.dirname(__file__), "..", "..")
 if _src not in sys.path:
     sys.path.insert(0, os.path.abspath(_src))
 
-from su_mcp_bridge.transport.ws_client import (
-    SketchUpWSClient,
+from su_mcp_bridge.core.logger import get_logger  # noqa: E402
+from su_mcp_bridge.transport.ws_client import (  # noqa: E402
+    BridgeConnectionError,
     BridgeError,
     BridgeTimeout,
-    BridgeConnectionError,
+    SketchUpWSClient,
 )
-from su_mcp_bridge.core.logger import get_logger
 
 log = get_logger(__name__)
 
@@ -83,6 +82,7 @@ def _get_client() -> SketchUpWSClient:
 def _call(method: str, params: dict | None = None, timeout: float | None = None) -> Any:
     """Send a JSON-RPC request to the SketchUp bridge and return the result."""
     from su_mcp_bridge.transport.ws_client import SketchUpWSClient
+
     client = _get_client()
     # Auto-scale timeout for batch calls based on the number of sub-ops.
     if timeout is None and method == "ops.batch":
@@ -116,6 +116,7 @@ def hello() -> str:
     result = _call("hello", {"client_version": "1.0.0"})
     return json.dumps(result, indent=2)
 
+
 @mcp.tool()
 def capture_view(
     preset: str = "iso",
@@ -143,9 +144,12 @@ def capture_view(
         "style": style,
         "isolate": isolate,
     }
-    if entity_id: params["entity_id"] = entity_id
-    if ai_id: params["ai_id"] = ai_id
-    if name: params["name"] = name
+    if entity_id:
+        params["entity_id"] = entity_id
+    if ai_id:
+        params["ai_id"] = ai_id
+    if name:
+        params["name"] = name
 
     result = _call("view.capture", params)
     return json.dumps(result, indent=2)
@@ -173,13 +177,16 @@ def create_wall(
         height_mm: Wall height in mm (default 2800)
         level: Level/layer name (default "GF")
     """
-    result = _call("ops.wall.create", {
-        "ai_id": ai_id,
-        "centerline": centerline,
-        "thickness_mm": thickness_mm,
-        "height_mm": height_mm,
-        "level": level,
-    })
+    result = _call(
+        "ops.wall.create",
+        {
+            "ai_id": ai_id,
+            "centerline": centerline,
+            "thickness_mm": thickness_mm,
+            "height_mm": height_mm,
+            "level": level,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -200,13 +207,16 @@ def modify_wall(
         height_mm: New height in mm
         level: Level/layer name
     """
-    result = _call("ops.wall.modify", {
-        "ai_id": ai_id,
-        "centerline": centerline,
-        "thickness_mm": thickness_mm,
-        "height_mm": height_mm,
-        "level": level,
-    })
+    result = _call(
+        "ops.wall.modify",
+        {
+            "ai_id": ai_id,
+            "centerline": centerline,
+            "thickness_mm": thickness_mm,
+            "height_mm": height_mm,
+            "level": level,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -245,14 +255,17 @@ def cut_opening(
         height_mm: Opening height in mm
         sill_mm: Height above floor in mm (0 for doors, ~900 for windows)
     """
-    result = _call("ops.opening.cut", {
-        "ai_id": ai_id,
-        "wall_id": wall_id,
-        "offset_mm": offset_mm,
-        "width_mm": width_mm,
-        "height_mm": height_mm,
-        "sill_mm": sill_mm,
-    })
+    result = _call(
+        "ops.opening.cut",
+        {
+            "ai_id": ai_id,
+            "wall_id": wall_id,
+            "offset_mm": offset_mm,
+            "width_mm": width_mm,
+            "height_mm": height_mm,
+            "sill_mm": sill_mm,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -327,13 +340,16 @@ def create_slab(
         top_or_bottom: "top" or "bottom" relative to base_z
         base_z_mm: Base elevation in mm
     """
-    result = _call("ops.slab.create", {
-        "ai_id": ai_id,
-        "polygon": polygon,
-        "thickness_mm": thickness_mm,
-        "top_or_bottom": top_or_bottom,
-        "base_z_mm": base_z_mm,
-    })
+    result = _call(
+        "ops.slab.create",
+        {
+            "ai_id": ai_id,
+            "polygon": polygon,
+            "thickness_mm": thickness_mm,
+            "top_or_bottom": top_or_bottom,
+            "base_z_mm": base_z_mm,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -363,15 +379,18 @@ def create_roof(
         eave_overhang_mm: Overhang beyond footprint
         base_z_mm: Base elevation (typically wall top)
     """
-    result = _call("ops.roof.create", {
-        "ai_id": ai_id,
-        "kind": kind,
-        "footprint": footprint,
-        "pitch_deg": pitch_deg,
-        "ridge_height_mm": ridge_height_mm,
-        "eave_overhang_mm": eave_overhang_mm,
-        "base_z_mm": base_z_mm,
-    })
+    result = _call(
+        "ops.roof.create",
+        {
+            "ai_id": ai_id,
+            "kind": kind,
+            "footprint": footprint,
+            "pitch_deg": pitch_deg,
+            "ridge_height_mm": ridge_height_mm,
+            "eave_overhang_mm": eave_overhang_mm,
+            "base_z_mm": base_z_mm,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -472,12 +491,15 @@ def create_primitive(
         transform["position_mm"] = position_mm
     if rotation_deg:
         transform["rotation_deg"] = rotation_deg
-    result = _call("ops.primitive.create", {
-        "ai_id": ai_id,
-        "kind": kind,
-        "dimensions": dimensions,
-        "transform": transform,
-    })
+    result = _call(
+        "ops.primitive.create",
+        {
+            "ai_id": ai_id,
+            "kind": kind,
+            "dimensions": dimensions,
+            "transform": transform,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -499,11 +521,14 @@ def upsert_material(
         color_hex: Color as "RRGGBB" hex string (no # prefix)
         alpha: Opacity 0.0-1.0 (default 1.0)
     """
-    result = _call("ops.material.upsert", {
-        "id": id,
-        "color_hex": color_hex,
-        "alpha": alpha,
-    })
+    result = _call(
+        "ops.material.upsert",
+        {
+            "id": id,
+            "color_hex": color_hex,
+            "alpha": alpha,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -515,10 +540,13 @@ def assign_material(material_id: str, target_ids: list[str]) -> str:
         material_id: ID of the material to assign
         target_ids: List of entity ai_ids to apply the material to
     """
-    result = _call("ops.material.assign", {
-        "material_id": material_id,
-        "target_ids": target_ids,
-    })
+    result = _call(
+        "ops.material.assign",
+        {
+            "material_id": material_id,
+            "target_ids": target_ids,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -550,10 +578,13 @@ def assign_layer(layer_id: str, target_ids: list[str]) -> str:
         layer_id: ID of the layer
         target_ids: List of entity ai_ids to assign
     """
-    result = _call("ops.layer.assign", {
-        "layer_id": layer_id,
-        "target_ids": target_ids,
-    })
+    result = _call(
+        "ops.layer.assign",
+        {
+            "layer_id": layer_id,
+            "target_ids": target_ids,
+        },
+    )
     return json.dumps(result, indent=2)
 
 
@@ -642,17 +673,17 @@ def verify_model(expected_ids: list[str]) -> str:
 
 
 @mcp.tool()
-def capture_view(
+def capture_view_to_dir(
     preset: str = "iso",
     resolution: str = "med",
     save_dir: str = "",
 ) -> str:
-    """Capture a screenshot of the model from a preset camera angle.
+    """Capture a screenshot and save it to a specific directory.
 
     Args:
         preset: Camera preset - "plan", "iso", "elev_n", "elev_e", "elev_s", "elev_w"
         resolution: "low" (512x384), "med" (1024x768), "high" (1920x1440)
-        save_dir: Directory to save captures (default: C:/su_capture)
+        save_dir: Directory to save captures (default: active project captures dir)
     """
     params: dict[str, Any] = {"preset": preset, "resolution": resolution}
     if save_dir:
@@ -660,6 +691,7 @@ def capture_view(
     else:
         try:
             from su_mcp_bridge.core.project import get_active_project
+
             project = get_active_project()
             if project:
                 params["project_captures_dir"] = str(project.captures_dir)
@@ -686,6 +718,7 @@ def capture_canonical(
     else:
         try:
             from su_mcp_bridge.core.project import get_active_project
+
             project = get_active_project()
             if project:
                 params["project_captures_dir"] = str(project.captures_dir)
@@ -726,12 +759,15 @@ def view_snapshot(
                 axes/selection/overlays, ideal for high-resolution AI inspection
                 of geometry alone.
     """
-    result = _call("view.snapshot", {
-        "width": width,
-        "height": height,
-        "quality": quality,
-        "source": source,
-    })
+    result = _call(
+        "view.snapshot",
+        {
+            "width": width,
+            "height": height,
+            "quality": quality,
+            "source": source,
+        },
+    )
     if isinstance(result, dict) and result.get("error"):
         return json.dumps(result, indent=2)
     if not isinstance(result, dict) or not result.get("image_base64"):
@@ -787,10 +823,14 @@ def configure_live_view(
                   this window share a single capture (default 100)
     """
     params: dict[str, Any] = {}
-    if width    is not None: params["width"]    = width
-    if height   is not None: params["height"]   = height
-    if quality  is not None: params["quality"]  = quality
-    if cache_ms is not None: params["cache_ms"] = cache_ms
+    if width is not None:
+        params["width"] = width
+    if height is not None:
+        params["height"] = height
+    if quality is not None:
+        params["quality"] = quality
+    if cache_ms is not None:
+        params["cache_ms"] = cache_ms
     return json.dumps(_call("view.stream.configure", params), indent=2)
 
 
@@ -864,11 +904,16 @@ def set_camera(
         fov:    field-of-view in degrees (perspective only)
     """
     params: dict[str, Any] = {}
-    if eye         is not None: params["eye"]         = eye
-    if target      is not None: params["target"]      = target
-    if up          is not None: params["up"]          = up
-    if perspective is not None: params["perspective"] = perspective
-    if fov         is not None: params["fov"]         = fov
+    if eye is not None:
+        params["eye"] = eye
+    if target is not None:
+        params["target"] = target
+    if up is not None:
+        params["up"] = up
+    if perspective is not None:
+        params["perspective"] = perspective
+    if fov is not None:
+        params["fov"] = fov
     return json.dumps(_call("view.set_camera", params), indent=2)
 
 
@@ -896,11 +941,16 @@ def select_entity(
         mode: "add" (default), "replace" (clear first), or "toggle"
     """
     params: dict[str, Any] = {"mode": mode}
-    if ai_id          is not None: params["ai_id"]          = ai_id
-    if ai_ids         is not None: params["ai_ids"]         = ai_ids
-    if persistent_id  is not None: params["persistent_id"]  = persistent_id
-    if persistent_ids is not None: params["persistent_ids"] = persistent_ids
-    if name           is not None: params["name"]           = name
+    if ai_id is not None:
+        params["ai_id"] = ai_id
+    if ai_ids is not None:
+        params["ai_ids"] = ai_ids
+    if persistent_id is not None:
+        params["persistent_id"] = persistent_id
+    if persistent_ids is not None:
+        params["persistent_ids"] = persistent_ids
+    if name is not None:
+        params["name"] = name
     return json.dumps(_call("selection.select", params), indent=2)
 
 
@@ -913,10 +963,14 @@ def deselect_entity(
 ) -> str:
     """Remove specified entities from the selection without clearing the rest."""
     params: dict[str, Any] = {}
-    if ai_id          is not None: params["ai_id"]          = ai_id
-    if ai_ids         is not None: params["ai_ids"]         = ai_ids
-    if persistent_id  is not None: params["persistent_id"]  = persistent_id
-    if persistent_ids is not None: params["persistent_ids"] = persistent_ids
+    if ai_id is not None:
+        params["ai_id"] = ai_id
+    if ai_ids is not None:
+        params["ai_ids"] = ai_ids
+    if persistent_id is not None:
+        params["persistent_id"] = persistent_id
+    if persistent_ids is not None:
+        params["persistent_ids"] = persistent_ids
     return json.dumps(_call("selection.deselect", params), indent=2)
 
 
@@ -945,10 +999,14 @@ def isolate_entity(
     the live view on a specific component while AI work proceeds.
     """
     params: dict[str, Any] = {}
-    if ai_id          is not None: params["ai_id"]          = ai_id
-    if ai_ids         is not None: params["ai_ids"]         = ai_ids
-    if persistent_id  is not None: params["persistent_id"]  = persistent_id
-    if persistent_ids is not None: params["persistent_ids"] = persistent_ids
+    if ai_id is not None:
+        params["ai_id"] = ai_id
+    if ai_ids is not None:
+        params["ai_ids"] = ai_ids
+    if persistent_id is not None:
+        params["persistent_id"] = persistent_id
+    if persistent_ids is not None:
+        params["persistent_ids"] = persistent_ids
     return json.dumps(_call("view.isolate", params), indent=2)
 
 
@@ -993,6 +1051,7 @@ def create_dimension(
 # PARSER TOOLS
 # ===========================================================================
 
+
 @mcp.tool()
 def parse_dxf_plan(
     filepath: str,
@@ -1002,9 +1061,9 @@ def parse_dxf_plan(
     scale_factor: float = 1.0,
 ) -> str:
     """Extract walls from a 2D DXF floorplan.
-    
+
     Returns a list of wall creation dictionaries that can be fed into batch_operations.
-    
+
     Args:
         filepath: Absolute path to the .dxf file
         layer_name: If specified, only extract from this layer (e.g. "WALLS")
@@ -1014,6 +1073,7 @@ def parse_dxf_plan(
     """
     try:
         from su_mcp_bridge.parser.dxf import parse_dxf_walls
+
         layer_arg = layer_name if layer_name else None
         walls = parse_dxf_walls(
             filepath=filepath,
@@ -1069,7 +1129,7 @@ def deep_scan(
 @mcp.tool()
 def generate_report(format: str = "md") -> str:
     """Generate a structured report from the current model state.
-    
+
     Args:
         format: Output format - "md" (Markdown), "csv", or "json"
     """
@@ -1078,9 +1138,9 @@ def generate_report(format: str = "md") -> str:
         return json.dumps(scan_data)
 
     from su_mcp_bridge.core.report import (
-        generate_model_report,
         generate_csv_inventory,
         generate_json_snapshot,
+        generate_model_report,
     )
 
     try:
@@ -1099,14 +1159,15 @@ def generate_report(format: str = "md") -> str:
 # EXECUTION TOOLS
 # ===========================================================================
 
+
 @mcp.tool()
 def execute_ruby(code: str) -> str:
     """Execute raw arbitrary Ruby code directly inside the SketchUp environment.
-    
+
     WARNING: Use this only when you need to perform complex operations,
     custom math, or access SketchUp Ruby API methods that are not exposed
     by the standard MCP tools.
-    
+
     Args:
         code: A string containing valid SketchUp Ruby code.
     """
@@ -1122,7 +1183,7 @@ def execute_ruby(code: str) -> str:
 @mcp.tool()
 def save_file(path: str = "") -> str:
     """Save the active SketchUp model.
-    
+
     Args:
         path: Optional file path to save to. If empty, saves to current location.
     """
@@ -1133,6 +1194,7 @@ def save_file(path: str = "") -> str:
         # Auto-route to project model/ folder if active project
         try:
             from su_mcp_bridge.core.project import get_active_project
+
             project = get_active_project()
             if project:
                 auto_path = str(project.model_dir / f"{project.name.replace(' ', '_')}.skp")
@@ -1146,7 +1208,7 @@ def save_file(path: str = "") -> str:
 @mcp.tool()
 def save_as(path: str) -> str:
     """Save the model to a new file path.
-    
+
     Args:
         path: Absolute path for the new .skp file
     """
@@ -1164,7 +1226,7 @@ def new_file() -> str:
 @mcp.tool()
 def open_file(path: str) -> str:
     """Open an existing .skp file in SketchUp.
-    
+
     Args:
         path: Absolute path to the .skp file
     """
@@ -1187,12 +1249,13 @@ def model_info() -> str:
 @mcp.tool()
 def create_project(name: str, base_dir: str = "") -> str:
     """Create a new project with a structured folder layout.
-    
+
     Args:
         name: Human-readable project name (e.g. "My House")
         base_dir: Base directory for projects (default: ~/Documents/SU_MCP_Projects)
     """
     from su_mcp_bridge.core.project import create_project as _create
+
     try:
         ctx = _create(name, base_dir)
         return json.dumps({"status": "created", "project": ctx.to_dict()})
@@ -1203,11 +1266,12 @@ def create_project(name: str, base_dir: str = "") -> str:
 @mcp.tool()
 def list_all_projects(base_dir: str = "") -> str:
     """List all existing projects.
-    
+
     Args:
         base_dir: Base directory to scan (default: ~/Documents/SU_MCP_Projects)
     """
     from su_mcp_bridge.core.project import list_projects
+
     projects = list_projects(base_dir)
     return json.dumps({"projects": projects, "total": len(projects)}, indent=2)
 
@@ -1216,12 +1280,13 @@ def list_all_projects(base_dir: str = "") -> str:
 def set_active_project(name: str, base_dir: str = "") -> str:
     """Open and set a project as the active context. All captures and reports
     will be auto-routed to this project's folders.
-    
+
     Args:
         name: Project name (fuzzy matched against folder names)
         base_dir: Base directory (default: ~/Documents/SU_MCP_Projects)
     """
     from su_mcp_bridge.core.project import open_project
+
     ctx = open_project(name, base_dir)
     if ctx:
         return json.dumps({"status": "opened", "project": ctx.to_dict()})
@@ -1236,7 +1301,7 @@ def set_active_project(name: str, base_dir: str = "") -> str:
 @mcp.tool()
 def detect_clashes(tolerance_mm: float = 1.0) -> str:
     """Detect geometric clashes (AABB overlaps) between all AI-tracked entities.
-    
+
     Args:
         tolerance_mm: Ignore overlaps smaller than this (default 1mm)
     """
@@ -1258,7 +1323,7 @@ def generate_walkthrough(
     save_dir: str = "",
 ) -> str:
     """Generate an automated camera walkthrough video of the model.
-    
+
     Args:
         preset: Camera motion - "orbit" (360° aerial), "flythrough" (linear path), "cinematic" (smooth arc)
         frames: Number of frames to render (default 120)
@@ -1285,7 +1350,7 @@ def capture_hq_render(
     save_dir: str = "",
 ) -> str:
     """Capture a high-quality render of the model (3840x2880 ultra resolution).
-    
+
     Args:
         preset: Camera preset - "plan", "iso", "elev_n", "elev_e", "elev_s", "elev_w"
         resolution: "low", "med", "high", or "ultra" (3840x2880, default)
@@ -1298,6 +1363,7 @@ def capture_hq_render(
         # Auto-route HQ renders to project assets/ folder
         try:
             from su_mcp_bridge.core.project import get_active_project
+
             project = get_active_project()
             if project:
                 params["save_dir"] = str(project.assets_dir)
@@ -1397,12 +1463,15 @@ def set_entity_attribute(
         key: Attribute key (e.g. "structural_role")
         value: Value to store — string, number, or boolean
     """
-    result = _call("ops.attr.set", {
-        "ai_id": ai_id,
-        "dict_name": dict_name,
-        "key": key,
-        "value": value,
-    })
+    result = _call(
+        "ops.attr.set",
+        {
+            "ai_id": ai_id,
+            "dict_name": dict_name,
+            "key": key,
+            "value": value,
+        },
+    )
     return json.dumps(result, indent=2)
 
 

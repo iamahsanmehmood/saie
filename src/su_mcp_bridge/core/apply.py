@@ -17,7 +17,7 @@ resulting wall keeps its `ai_id` because we re-create with the same id.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List
+from typing import Any
 
 from .diff import ChangeSet, EntityCreated, EntityDeleted, EntityModified
 from .geometry import resolve_butt_joints
@@ -27,7 +27,7 @@ log = get_logger(__name__)
 
 # Phase order for batched application. Earlier groups are applied first.
 # Within a phase we order: deletes, then modifies, then creates.
-_ENTITY_PHASE_ORDER: List[str] = [
+_ENTITY_PHASE_ORDER: list[str] = [
     "Material",
     "Layer",
     "Level",
@@ -56,11 +56,13 @@ def _phase_index(entity_type: str) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _wall_create_op(data: Dict[str, Any], adjusted_centerlines: Dict[str, List[List[float]]] = None) -> Dict[str, Any]:
+def _wall_create_op(
+    data: dict[str, Any], adjusted_centerlines: dict[str, list[list[float]]] = None
+) -> dict[str, Any]:
     centerline = data["centerline"]
     if adjusted_centerlines and data["id"] in adjusted_centerlines:
         centerline = adjusted_centerlines[data["id"]]
-        
+
     return {
         "method": "ops.wall.create",
         "params": {
@@ -73,7 +75,7 @@ def _wall_create_op(data: Dict[str, Any], adjusted_centerlines: Dict[str, List[L
     }
 
 
-def _opening_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
+def _opening_create_op(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "method": "ops.opening.cut",
         "params": {
@@ -88,7 +90,7 @@ def _opening_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _slab_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
+def _slab_create_op(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "method": "ops.slab.create",
         "params": {
@@ -101,7 +103,7 @@ def _slab_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _roof_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
+def _roof_create_op(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "method": "ops.roof.create",
         "params": {
@@ -115,7 +117,7 @@ def _roof_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _primitive_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
+def _primitive_create_op(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "method": "ops.primitive.create",
         "params": {
@@ -127,7 +129,7 @@ def _primitive_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _component_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
+def _component_create_op(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "method": "ops.component.place",
         "params": {
@@ -141,11 +143,11 @@ def _component_create_op(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _material_upsert_op(data: Dict[str, Any]) -> Dict[str, Any]:
+def _material_upsert_op(data: dict[str, Any]) -> dict[str, Any]:
     return {"method": "ops.material.upsert", "params": data}
 
 
-def _layer_upsert_op(data: Dict[str, Any]) -> Dict[str, Any]:
+def _layer_upsert_op(data: dict[str, Any]) -> dict[str, Any]:
     return {"method": "ops.layer.upsert", "params": data}
 
 
@@ -161,7 +163,7 @@ _CREATE_DISPATCH = {
 }
 
 
-def _create_op(created: EntityCreated, context: Dict[str, Any] = None) -> Dict[str, Any]:
+def _create_op(created: EntityCreated, context: dict[str, Any] = None) -> dict[str, Any]:
     """Convert an EntityCreated into an ops.* call."""
     factory = _CREATE_DISPATCH.get(created.entity_type)
     if factory is None:
@@ -172,14 +174,18 @@ def _create_op(created: EntityCreated, context: Dict[str, Any] = None) -> Dict[s
         )
         return {
             "method": "ops.unknown.create",
-            "params": {"ai_id": created.entity_id, "type": created.entity_type, "data": created.data},
+            "params": {
+                "ai_id": created.entity_id,
+                "type": created.entity_type,
+                "data": created.data,
+            },
         }
     if created.entity_type == "Wall":
         return factory(created.data, context.get("adjusted_centerlines") if context else None)
     return factory(created.data)
 
 
-def _delete_op(deleted: EntityDeleted) -> Dict[str, Any]:
+def _delete_op(deleted: EntityDeleted) -> dict[str, Any]:
     return {
         "method": "ops.delete",
         "params": {
@@ -190,8 +196,8 @@ def _delete_op(deleted: EntityDeleted) -> Dict[str, Any]:
 
 
 def _modify_ops(
-    modified: EntityModified, new_data: Dict[str, Any], context: Dict[str, Any] = None
-) -> List[Dict[str, Any]]:
+    modified: EntityModified, new_data: dict[str, Any], context: dict[str, Any] = None
+) -> list[dict[str, Any]]:
     """Convert a modification into delete+recreate ops.
 
     SketchUp boolean ops make in-place geometry edits flaky. The simplest
@@ -209,13 +215,17 @@ def _modify_ops(
             "apply: cannot modify entity_type=%s (no recreate handler)",
             modified.entity_type,
         )
-        return [_delete_op(EntityDeleted(entity_id=modified.entity_id, entity_type=modified.entity_type))]
-    
+        return [
+            _delete_op(
+                EntityDeleted(entity_id=modified.entity_id, entity_type=modified.entity_type)
+            )
+        ]
+
     if modified.entity_type == "Wall":
         create_call = factory(new_data, context.get("adjusted_centerlines") if context else None)
     else:
         create_call = factory(new_data)
-        
+
     return [
         _delete_op(EntityDeleted(entity_id=modified.entity_id, entity_type=modified.entity_type)),
         create_call,
@@ -229,8 +239,8 @@ def _modify_ops(
 
 def changeset_to_ops(
     changeset: ChangeSet,
-    new_entities_by_id: Dict[str, Dict[str, Any]] | None = None,
-) -> List[Dict[str, Any]]:
+    new_entities_by_id: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     """Translate a ChangeSet into an ordered list of ops.
 
     Args:
@@ -244,27 +254,22 @@ def changeset_to_ops(
         A list of {"method": str, "params": dict} ready for `ops.batch`.
     """
     new_entities_by_id = new_entities_by_id or {}
-    ops: List[Dict[str, Any]] = []
+    ops: list[dict[str, Any]] = []
 
     # Calculate adjusted centerlines ONLY for explicit Wall entities
     walls_in_new_state = [
-        data for data in new_entities_by_id.values() 
-        if data.get("_type") == "Wall"
+        data for data in new_entities_by_id.values() if data.get("_type") == "Wall"
     ]
     adjusted_centerlines = resolve_butt_joints(walls_in_new_state) if walls_in_new_state else {}
     context = {"adjusted_centerlines": adjusted_centerlines}
 
     # 1. Deletes first, ordered by phase ascending.
-    deletes = sorted(
-        changeset.deleted, key=lambda d: (_phase_index(d.entity_type), d.entity_id)
-    )
+    deletes = sorted(changeset.deleted, key=lambda d: (_phase_index(d.entity_type), d.entity_id))
     for d in deletes:
         ops.append(_delete_op(d))
 
     # 2. Modifies next.
-    modifies = sorted(
-        changeset.modified, key=lambda m: (_phase_index(m.entity_type), m.entity_id)
-    )
+    modifies = sorted(changeset.modified, key=lambda m: (_phase_index(m.entity_type), m.entity_id))
     for m in modifies:
         new_data = new_entities_by_id.get(m.entity_id)
         if new_data is None:
@@ -272,16 +277,12 @@ def changeset_to_ops(
                 "apply: no new data for modified entity %s; emitting delete only",
                 m.entity_id,
             )
-            ops.append(
-                _delete_op(EntityDeleted(entity_id=m.entity_id, entity_type=m.entity_type))
-            )
+            ops.append(_delete_op(EntityDeleted(entity_id=m.entity_id, entity_type=m.entity_type)))
             continue
         ops.extend(_modify_ops(m, new_data, context))
 
     # 3. Creates last, ordered by phase ascending.
-    creates = sorted(
-        changeset.created, key=lambda c: (_phase_index(c.entity_type), c.entity_id)
-    )
+    creates = sorted(changeset.created, key=lambda c: (_phase_index(c.entity_type), c.entity_id))
     for c in creates:
         ops.append(_create_op(c, context))
 
@@ -289,11 +290,11 @@ def changeset_to_ops(
 
 
 def dispatch_in_chunks(
-    ops: List[Dict[str, Any]],
+    ops: list[dict[str, Any]],
     client: Any,
     chunk_size: int = 50,
     mode: str = "atomic",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Dispatch a large op list as sequential chunked batches.
 
     A single ops.batch with 500 ops can time out or make SketchUp unresponsive.
@@ -320,7 +321,7 @@ def dispatch_in_chunks(
 
     total = len(ops)
     n_chunks = math.ceil(total / chunk_size)
-    all_results: List[Any] = []
+    all_results: list[Any] = []
 
     log.info("dispatch_in_chunks: %d ops → %d chunks of ≤%d", total, n_chunks, chunk_size)
 
@@ -350,13 +351,13 @@ def dispatch_in_chunks(
     return all_results
 
 
-def index_entities_by_id(model: Any) -> Dict[str, Dict[str, Any]]:
+def index_entities_by_id(model: Any) -> dict[str, dict[str, Any]]:
     """Walk a BuildingModel and return {ai_id: dump_dict}.
 
     Used by `model.apply` to feed `changeset_to_ops` so modifications can
     look up the new field values.
     """
-    out: Dict[str, Dict[str, Any]] = {}
+    out: dict[str, dict[str, Any]] = {}
     for m in getattr(model, "materials", []) or []:
         out[m.id] = m.model_dump()
     for layer in getattr(model, "layers", []) or []:

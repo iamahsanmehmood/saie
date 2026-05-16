@@ -7,7 +7,7 @@ that conversion happens. Do NOT scatter `/ 25.4` literals across the codebase.
 
 from __future__ import annotations
 
-from typing import Iterable, List, Sequence, Tuple
+from collections.abc import Iterable, Sequence
 
 # Exact conversion factor (international inch).
 MM_PER_INCH: float = 25.4
@@ -27,7 +27,7 @@ def in_to_mm(value: float) -> float:
     return float(value) * MM_PER_INCH
 
 
-def point_mm_to_in(point: Sequence[float]) -> List[float]:
+def point_mm_to_in(point: Sequence[float]) -> list[float]:
     """Convert an N-D point in mm to a list in inches.
 
     Works for 2-D and 3-D. Preserves the dimensionality.
@@ -35,17 +35,17 @@ def point_mm_to_in(point: Sequence[float]) -> List[float]:
     return [mm_to_in(c) for c in point]
 
 
-def point_in_to_mm(point: Sequence[float]) -> List[float]:
+def point_in_to_mm(point: Sequence[float]) -> list[float]:
     """Convert an N-D point in inches to a list in mm."""
     return [in_to_mm(c) for c in point]
 
 
-def polygon_mm_to_in(polygon: Iterable[Sequence[float]]) -> List[List[float]]:
+def polygon_mm_to_in(polygon: Iterable[Sequence[float]]) -> list[list[float]]:
     """Convert a polygon (list of points) from mm to inches."""
     return [point_mm_to_in(p) for p in polygon]
 
 
-def polygon_in_to_mm(polygon: Iterable[Sequence[float]]) -> List[List[float]]:
+def polygon_in_to_mm(polygon: Iterable[Sequence[float]]) -> list[list[float]]:
     """Convert a polygon (list of points) from inches to mm."""
     return [point_in_to_mm(p) for p in polygon]
 
@@ -60,7 +60,7 @@ def feet_inches_to_mm(feet: float, inches: float = 0.0) -> float:
     return in_to_mm(feet * 12.0 + inches)
 
 
-def mm_to_feet_inches(value_mm: float) -> Tuple[int, float]:
+def mm_to_feet_inches(value_mm: float) -> tuple[int, float]:
     """Return (feet, remaining_inches). Inches kept as float for precision."""
     total_inches = mm_to_in(value_mm)
     feet = int(total_inches // 12)

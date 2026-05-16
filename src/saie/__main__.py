@@ -1,4 +1,5 @@
 """Allow `python -m saie` to start the MCP server (stdio transport)."""
+
 from su_mcp_bridge.mcp_server.server import mcp
 
 

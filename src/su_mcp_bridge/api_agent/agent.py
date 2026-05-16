@@ -28,13 +28,13 @@ _src = os.path.join(os.path.dirname(__file__), "..", "..")
 if _src not in sys.path:
     sys.path.insert(0, os.path.abspath(_src))
 
-from su_mcp_bridge.transport.ws_client import (
-    SketchUpWSClient,
+from su_mcp_bridge.core.logger import get_logger  # noqa: E402
+from su_mcp_bridge.transport.ws_client import (  # noqa: E402
+    BridgeConnectionError,
     BridgeError,
     BridgeTimeout,
-    BridgeConnectionError,
+    SketchUpWSClient,
 )
-from su_mcp_bridge.core.logger import get_logger
 
 log = get_logger(__name__)
 
@@ -81,7 +81,10 @@ TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {
                 "ai_id": {"type": "string"},
-                "centerline": {"type": "array", "items": {"type": "array", "items": {"type": "number"}}},
+                "centerline": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
                 "thickness_mm": {"type": "number", "default": 150},
                 "height_mm": {"type": "number", "default": 2800},
                 "level": {"type": "string", "default": "GF"},
@@ -107,7 +110,10 @@ TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "ai_id": {"type": "string", "description": "Opening ID, e.g. 'DOOR_1'"},
                 "wall_id": {"type": "string", "description": "ID of the wall to cut"},
-                "offset_mm": {"type": "number", "description": "Distance from wall start along centerline"},
+                "offset_mm": {
+                    "type": "number",
+                    "description": "Distance from wall start along centerline",
+                },
                 "width_mm": {"type": "number"},
                 "height_mm": {"type": "number"},
                 "sill_mm": {"type": "number", "default": 0},
@@ -148,7 +154,10 @@ TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {
                 "ai_id": {"type": "string"},
-                "polygon": {"type": "array", "items": {"type": "array", "items": {"type": "number"}}},
+                "polygon": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
                 "thickness_mm": {"type": "number", "default": 150},
                 "top_or_bottom": {"type": "string", "enum": ["top", "bottom"], "default": "bottom"},
                 "base_z_mm": {"type": "number", "default": 0},
@@ -164,8 +173,15 @@ TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {
                 "ai_id": {"type": "string"},
-                "footprint": {"type": "array", "items": {"type": "array", "items": {"type": "number"}}},
-                "kind": {"type": "string", "enum": ["flat", "shed", "gable", "hip"], "default": "gable"},
+                "footprint": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": ["flat", "shed", "gable", "hip"],
+                    "default": "gable",
+                },
                 "pitch_deg": {"type": "number", "default": 30},
                 "ridge_height_mm": {"type": "number", "default": 0},
                 "base_z_mm": {"type": "number", "default": 0},
@@ -301,7 +317,10 @@ TOOLS: list[dict[str, Any]] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "preset": {"type": "string", "enum": ["plan", "iso", "elev_n", "elev_e", "elev_s", "elev_w"]},
+                "preset": {
+                    "type": "string",
+                    "enum": ["plan", "iso", "elev_n", "elev_e", "elev_s", "elev_w"],
+                },
                 "resolution": {"type": "string", "enum": ["low", "med", "high"], "default": "med"},
                 "save_dir": {"type": "string"},
             },
@@ -374,7 +393,11 @@ TOOLS: list[dict[str, Any]] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "preset": {"type": "string", "enum": ["orbit", "flythrough", "cinematic"], "default": "orbit"},
+                "preset": {
+                    "type": "string",
+                    "enum": ["orbit", "flythrough", "cinematic"],
+                    "default": "orbit",
+                },
                 "frames": {"type": "integer", "default": 120},
                 "fps": {"type": "integer", "default": 30},
                 "resolution": {"type": "string", "enum": ["low", "med", "high"], "default": "med"},
@@ -454,6 +477,7 @@ Be precise. Be deterministic. Think before you act.
 # Agent
 # ---------------------------------------------------------------------------
 
+
 class BuilderAgent:
     """Synchronous tool-use agent loop powered by Anthropic Claude."""
 
@@ -468,9 +492,7 @@ class BuilderAgent:
     ):
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
-            raise EnvironmentError(
-                "ANTHROPIC_API_KEY not set. Export it or add to .env."
-            )
+            raise OSError("ANTHROPIC_API_KEY not set. Export it or add to .env.")
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
         self.max_turns = max_turns
@@ -500,6 +522,7 @@ class BuilderAgent:
             if method.startswith("local."):
                 if method == "local.parse_dxf_plan":
                     from su_mcp_bridge.parser.dxf import parse_dxf_walls
+
                     walls = parse_dxf_walls(
                         filepath=tool_input["filepath"],
                         layer_name=tool_input.get("layer_name"),
@@ -507,9 +530,11 @@ class BuilderAgent:
                         default_height_mm=tool_input.get("default_height_mm", 2500.0),
                         scale_factor=tool_input.get("scale_factor", 1.0),
                     )
-                    return json.dumps({"status": "parsed", "wall_count": len(walls), "walls": walls}, indent=2)
+                    return json.dumps(
+                        {"status": "parsed", "wall_count": len(walls), "walls": walls}, indent=2
+                    )
                 return json.dumps({"error": f"Unknown local method {method}"})
-                
+
             result = self._bridge.send_request(method, tool_input)
             return json.dumps(result, indent=2)
         except BridgeConnectionError as e:
@@ -529,13 +554,13 @@ class BuilderAgent:
         self.messages.append({"role": "user", "content": user_message})
 
         if self.verbose:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"  User: {user_message[:80]}{'...' if len(user_message) > 80 else ''}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
         final_text = ""
 
-        for turn in range(self.max_turns):
+        for _turn in range(self.max_turns):
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
@@ -552,7 +577,9 @@ class BuilderAgent:
                         final_text += block.text
                 self.messages.append({"role": "assistant", "content": response.content})
                 if self.verbose:
-                    print(f"\n[assistant] {final_text[:200]}{'...' if len(final_text) > 200 else ''}")
+                    print(
+                        f"\n[assistant] {final_text[:200]}{'...' if len(final_text) > 200 else ''}"
+                    )
                 break
 
             elif response.stop_reason == "tool_use":
@@ -576,11 +603,13 @@ class BuilderAgent:
                                 result_preview = result_preview[:117] + "..."
                             print(f"         -> {result_preview}")
 
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result_str,
-                        })
+                        tool_results.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": result_str,
+                            }
+                        )
                     elif hasattr(block, "text") and block.text:
                         if self.verbose:
                             print(f"  [thinking] {block.text[:100]}")

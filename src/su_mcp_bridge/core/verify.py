@@ -12,11 +12,9 @@ returned by Ruby, and produces a Verification report.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from .model import BuildingModel
-from .units import EPS_MM, mm_to_in
-
 
 SOFT_TOLERANCE_IN = 0.05
 """Bounds difference under this (inches) is reported but doesn't fail. ~1.3mm."""
@@ -25,10 +23,10 @@ SOFT_TOLERANCE_IN = 0.05
 @dataclass
 class Divergence:
     severity: str  # "warning" | "error"
-    entity_id: Optional[str]
+    entity_id: str | None
     code: str
     message: str
-    detail: Dict[str, Any] = field(default_factory=dict)
+    detail: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         return f"[{self.severity.upper()}] {self.code} {self.entity_id or '-'}: {self.message}"
@@ -37,19 +35,19 @@ class Divergence:
 @dataclass
 class VerifyReport:
     ok: bool
-    divergences: List[Divergence] = field(default_factory=list)
-    found_ids: Set[str] = field(default_factory=set)
-    expected_ids: Set[str] = field(default_factory=set)
+    divergences: list[Divergence] = field(default_factory=list)
+    found_ids: set[str] = field(default_factory=set)
+    expected_ids: set[str] = field(default_factory=set)
 
     @property
-    def missing(self) -> Set[str]:
+    def missing(self) -> set[str]:
         return self.expected_ids - self.found_ids
 
     @property
-    def orphans(self) -> Set[str]:
+    def orphans(self) -> set[str]:
         return self.found_ids - self.expected_ids
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ok": self.ok,
             "divergences": [d.__dict__ for d in self.divergences],
@@ -58,14 +56,14 @@ class VerifyReport:
         }
 
 
-def expected_entity_ids(model: BuildingModel) -> Set[str]:
+def expected_entity_ids(model: BuildingModel) -> set[str]:
     """Return the set of ai_ids the model says should exist in SketchUp.
 
     Walls, openings, slabs, roofs, columns, beams, components, primitives,
     parametric, and dimensions all carry stable IDs. Materials and layers
     do not become geometry, so they are excluded.
     """
-    ids: Set[str] = set()
+    ids: set[str] = set()
     for level in model.levels:
         ids.update(w.id for w in level.walls)
         ids.update(o.id for o in level.openings)
@@ -82,7 +80,7 @@ def expected_entity_ids(model: BuildingModel) -> Set[str]:
 
 def verify(
     model: BuildingModel,
-    sketchup_export: Dict[str, Any],
+    sketchup_export: dict[str, Any],
 ) -> VerifyReport:
     """Compare the expected BuildingModel against what Ruby reported.
 
@@ -98,8 +96,8 @@ def verify(
         }
     """
     expected = expected_entity_ids(model)
-    found: Set[str] = set()
-    divergences: List[Divergence] = []
+    found: set[str] = set()
+    divergences: list[Divergence] = []
 
     for entry in sketchup_export.get("entities", []) or []:
         ai_id = entry.get("ai_id")

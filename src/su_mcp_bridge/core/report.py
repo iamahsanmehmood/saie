@@ -6,11 +6,10 @@ Generates structured reports from deep scan data in Markdown, CSV, and JSON form
 from __future__ import annotations
 
 import csv
-import io
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .logger import get_logger
 from .project import get_active_project
@@ -19,9 +18,9 @@ log = get_logger(__name__)
 
 
 def generate_model_report(
-    scan_data: Dict[str, Any],
+    scan_data: dict[str, Any],
     output_dir: str = "",
-    bim_data: Optional[Dict[str, Dict[str, Any]]] = None,
+    bim_data: dict[str, dict[str, Any]] | None = None,
 ) -> Path:
     """Generate a structured Markdown report from scan data.
 
@@ -51,7 +50,7 @@ def generate_model_report(
 
     # Merge any bim attrs already embedded in scan entity records (future deep_scan).
     # Explicit bim_data arg wins over embedded data.
-    merged_bim: Dict[str, Dict[str, Any]] = {}
+    merged_bim: dict[str, dict[str, Any]] = {}
     for e in entities:
         ai_id = e.get("ai_id")
         if ai_id and e.get("bim"):
@@ -76,19 +75,26 @@ def generate_model_report(
     lines.append("| AI ID | Type | Layer | Material | Solid | Volume |")
     lines.append("|-------|------|-------|----------|-------|--------|")
     for e in entities:
-        ai_id    = e.get("ai_id", "?")
-        etype    = e.get("type", "?")
-        layer    = e.get("layer", "-")
+        ai_id = e.get("ai_id", "?")
+        etype = e.get("type", "?")
+        layer = e.get("layer", "-")
         material = e.get("material", "-")
-        solid    = "Yes" if e.get("is_solid") else "No"
-        volume   = f"{e.get('volume_mm3', 0):,.0f}" if e.get("volume_mm3") else "-"
+        solid = "Yes" if e.get("is_solid") else "No"
+        volume = f"{e.get('volume_mm3', 0):,.0f}" if e.get("volume_mm3") else "-"
         lines.append(f"| {ai_id} | {etype} | {layer} | {material} | {solid} | {volume} |")
     lines.append("")
 
     # BIM Data section — only when data is present
     if merged_bim:
-        bim_keys = ["structural_role", "material_spec", "fire_rating",
-                    "ifc_class", "cost_per_unit", "quantity_basis", "load_kpa"]
+        bim_keys = [
+            "structural_role",
+            "material_spec",
+            "fire_rating",
+            "ifc_class",
+            "cost_per_unit",
+            "quantity_basis",
+            "load_kpa",
+        ]
         # Collect only keys that appear at least once
         present_keys = [k for k in bim_keys if any(k in v for v in merged_bim.values())]
 
@@ -96,13 +102,15 @@ def generate_model_report(
             lines.append("## BIM Data")
             lines.append("")
             header = "| AI ID | " + " | ".join(present_keys) + " |"
-            sep    = "|-------|" + "|".join(["-------"] * len(present_keys)) + "|"
+            sep = "|-------|" + "|".join(["-------"] * len(present_keys)) + "|"
             lines.append(header)
             lines.append(sep)
             for e in entities:
                 ai_id = e.get("ai_id", "?")
-                bim   = merged_bim.get(ai_id, {})
-                row   = f"| {ai_id} | " + " | ".join(str(bim.get(k, "—")) for k in present_keys) + " |"
+                bim = merged_bim.get(ai_id, {})
+                row = (
+                    f"| {ai_id} | " + " | ".join(str(bim.get(k, "—")) for k in present_keys) + " |"
+                )
                 lines.append(row)
             lines.append("")
 
@@ -110,8 +118,8 @@ def generate_model_report(
         takeoff_rows = []
         for e in entities:
             ai_id = e.get("ai_id", "?")
-            bim   = merged_bim.get(ai_id, {})
-            cost  = bim.get("cost_per_unit")
+            bim = merged_bim.get(ai_id, {})
+            cost = bim.get("cost_per_unit")
             basis = bim.get("quantity_basis")
             if cost is None or basis is None:
                 continue
@@ -141,7 +149,7 @@ def generate_model_report(
             lines.append("")
 
     # Material Usage
-    mat_usage: Dict[str, int] = {}
+    mat_usage: dict[str, int] = {}
     for e in entities:
         mat = e.get("material", "None")
         mat_usage[mat] = mat_usage.get(mat, 0) + 1
@@ -155,7 +163,7 @@ def generate_model_report(
         lines.append("")
 
     # Layer Summary
-    layer_usage: Dict[str, int] = {}
+    layer_usage: dict[str, int] = {}
     for e in entities:
         layer = e.get("layer", "Default")
         layer_usage[layer] = layer_usage.get(layer, 0) + 1
@@ -176,7 +184,9 @@ def generate_model_report(
         lines.append("|------|-----------|-------|-------|-------|")
         for d in definitions:
             solid = "Yes" if d.get("is_solid") else "No"
-            lines.append(f"| {d.get('name', '?')} | {d.get('instances_count', 0)} | {d.get('faces', 0)} | {d.get('edges', 0)} | {solid} |")
+            lines.append(
+                f"| {d.get('name', '?')} | {d.get('instances_count', 0)} | {d.get('faces', 0)} | {d.get('edges', 0)} | {solid} |"
+            )
         lines.append("")
 
     # Warnings
@@ -186,7 +196,9 @@ def generate_model_report(
         lines.append("")
         for w in warnings:
             if not w.get("is_solid"):
-                lines.append(f"- **{w.get('ai_id', '?')}** ({w.get('type', '?')}): Non-solid geometry")
+                lines.append(
+                    f"- **{w.get('ai_id', '?')}** ({w.get('type', '?')}): Non-solid geometry"
+                )
             if not w.get("ai_id"):
                 lines.append(f"- Entity with GUID {w.get('guid', '?')}: Missing ai_id")
         lines.append("")
@@ -200,9 +212,9 @@ def generate_model_report(
 
 
 def generate_csv_inventory(
-    scan_data: Dict[str, Any],
+    scan_data: dict[str, Any],
     output_dir: str = "",
-    bim_data: Optional[Dict[str, Dict[str, Any]]] = None,
+    bim_data: dict[str, dict[str, Any]] | None = None,
 ) -> Path:
     """Generate a CSV inventory from scan data, with optional BIM attribute columns.
 
@@ -223,7 +235,7 @@ def generate_csv_inventory(
 
     entities = scan_data.get("entities", [])
 
-    merged_bim: Dict[str, Dict[str, Any]] = {}
+    merged_bim: dict[str, dict[str, Any]] = {}
     for e in entities:
         ai_id = e.get("ai_id")
         if ai_id and e.get("bim"):
@@ -231,12 +243,33 @@ def generate_csv_inventory(
     if bim_data:
         merged_bim.update(bim_data)
 
-    bim_keys = ["structural_role", "material_spec", "fire_rating",
-                "ifc_class", "cost_per_unit", "quantity_basis", "load_kpa", "notes"]
+    bim_keys = [
+        "structural_role",
+        "material_spec",
+        "fire_rating",
+        "ifc_class",
+        "cost_per_unit",
+        "quantity_basis",
+        "load_kpa",
+        "notes",
+    ]
 
-    base_cols = ["ai_id", "type", "layer", "material", "is_solid",
-                 "face_count", "edge_count", "volume_mm3",
-                 "min_x", "min_y", "min_z", "max_x", "max_y", "max_z"]
+    base_cols = [
+        "ai_id",
+        "type",
+        "layer",
+        "material",
+        "is_solid",
+        "face_count",
+        "edge_count",
+        "volume_mm3",
+        "min_x",
+        "min_y",
+        "min_z",
+        "max_x",
+        "max_y",
+        "max_z",
+    ]
 
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -246,8 +279,8 @@ def generate_csv_inventory(
             mins = bounds.get("min", [0, 0, 0])
             maxs = bounds.get("max", [0, 0, 0])
             ai_id = e.get("ai_id", "")
-            bim   = merged_bim.get(ai_id, {}) if merged_bim else {}
-            row   = [
+            bim = merged_bim.get(ai_id, {}) if merged_bim else {}
+            row = [
                 ai_id,
                 e.get("type", ""),
                 e.get("layer", ""),
@@ -271,7 +304,7 @@ def generate_csv_inventory(
     return filepath
 
 
-def generate_json_snapshot(scan_data: Dict[str, Any], output_dir: str = "") -> Path:
+def generate_json_snapshot(scan_data: dict[str, Any], output_dir: str = "") -> Path:
     """Save raw scan data as a JSON snapshot."""
     project = get_active_project()
     if not output_dir and project:

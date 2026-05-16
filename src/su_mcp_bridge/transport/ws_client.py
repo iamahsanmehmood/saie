@@ -25,18 +25,19 @@ import json
 import os
 import time
 import uuid
-from typing import Any, Dict, Optional
-from typing import Any, Dict, Optional
+from typing import Any
 
-from websockets.sync.client import connect as ws_connect
 from websockets.exceptions import ConnectionClosed, WebSocketException
+from websockets.sync.client import connect as ws_connect
 
 # Use core logger if available, else fall back to print.
 try:
     from su_mcp_bridge.core.logger import get_logger
+
     log = get_logger(__name__)
 except Exception:  # pragma: no cover -- core not yet importable during install
     import logging
+
     log = logging.getLogger(__name__)
 
 
@@ -48,7 +49,7 @@ except Exception:  # pragma: no cover -- core not yet importable during install
 class BridgeError(RuntimeError):
     """Base class for all SketchUp-bridge transport errors."""
 
-    def __init__(self, message: str, code: Optional[int] = None, data: Any = None):
+    def __init__(self, message: str, code: int | None = None, data: Any = None):
         super().__init__(message)
         self.code = code
         self.data = data
@@ -91,17 +92,17 @@ class SketchUpWSClient:
     RECONNECT_BACKOFF_S: float = 0.5
 
     # Adaptive timeout constants — used by batch_timeout() below.
-    _BATCH_BASE_S: float = 15.0   # minimum for any batch
+    _BATCH_BASE_S: float = 15.0  # minimum for any batch
     _BATCH_PER_OP_S: float = 0.8  # extra seconds per sub-op
-    _BATCH_MAX_S: float = 300.0   # hard cap (5 min)
+    _BATCH_MAX_S: float = 300.0  # hard cap (5 min)
 
     def __init__(
         self,
         host: str = "127.0.0.1",
-        port: Optional[int] = None,
+        port: int | None = None,
         timeout: float = DEFAULT_TIMEOUT_S,
     ):
-        # Allow the active port file to override the default 9876, 
+        # Allow the active port file to override the default 9876,
         # so multiple SketchUp instances don't clash and the CLI always talks to the most recent one.
         resolved_port = port
         if resolved_port is None:
@@ -109,7 +110,7 @@ class SketchUpWSClient:
             port_file = os.path.join(os.path.expanduser("~"), ".su_mcp_port")
             if os.path.exists(port_file):
                 try:
-                    with open(port_file, "r") as f:
+                    with open(port_file) as f:
                         resolved_port = int(f.read().strip())
                 except Exception:
                     pass
@@ -118,11 +119,11 @@ class SketchUpWSClient:
         self.timeout = timeout
         self._ws = None
         # Buffer for out-of-order or server-pushed messages we haven't claimed yet.
-        self._pending: Dict[str, Dict[str, Any]] = {}
+        self._pending: dict[str, dict[str, Any]] = {}
 
     # -- context manager -----------------------------------------------------
 
-    def __enter__(self) -> "SketchUpWSClient":
+    def __enter__(self) -> SketchUpWSClient:
         self.connect()
         return self
 
@@ -150,7 +151,7 @@ class SketchUpWSClient:
         """Open the WebSocket. Idempotent: no-op if already connected."""
         if self._ws is not None:
             return
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
         for attempt in range(1, self.MAX_RECONNECT_ATTEMPTS + 1):
             try:
                 self._ws = ws_connect(
@@ -196,8 +197,8 @@ class SketchUpWSClient:
     def send_request(
         self,
         method: str,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
     ) -> Any:
         """Send a JSON-RPC 2.0 request and block until the matching response.
 
@@ -239,7 +240,7 @@ class SketchUpWSClient:
 
         # Wait for the response with the matching id. Drop / log other messages.
         res = self._receive_matching(req_id, effective_timeout)
-        
+
         # Post-process: Convert PNG captures to WebP automatically to save bandwidth/storage.
         if method == "view.capture" and isinstance(res, dict) and res.get("path"):
             res["path"] = self._convert_png_to_webp(res["path"])
@@ -247,7 +248,7 @@ class SketchUpWSClient:
             for c in res.get("captures", []):
                 if c.get("path"):
                     c["path"] = self._convert_png_to_webp(c["path"])
-                    
+
         return res
 
     # -- internals -----------------------------------------------------------
@@ -302,7 +303,7 @@ class SketchUpWSClient:
             self._pending[msg_id] = msg
 
     @staticmethod
-    def _unwrap_response(response: Dict[str, Any]) -> Any:
+    def _unwrap_response(response: dict[str, Any]) -> Any:
         """Translate a JSON-RPC response into a Python return value or raise."""
         if "error" in response and response["error"] is not None:
             err = response["error"]
@@ -338,11 +339,11 @@ class SketchUpWSClient:
         except ImportError:
             log.warning("Pillow not installed; skipping WebP conversion.")
             return path
-            
+
         webp_path = path[:-4] + ".webp"
         try:
             with Image.open(path) as img:
-                # Convert to RGB if it's RGBA but we want a smaller file, 
+                # Convert to RGB if it's RGBA but we want a smaller file,
                 # but WebP supports alpha. We'll keep it as is.
                 img.save(webp_path, "WEBP", quality=85)
             # Remove original PNG to save space

@@ -1,10 +1,10 @@
 """su_mcp_bridge.transport — WebSocket client and protocol primitives."""
 
 from .ws_client import (
-    SketchUpWSClient,
+    BridgeConnectionError,
     BridgeError,
     BridgeTimeout,
-    BridgeConnectionError,
+    SketchUpWSClient,
 )
 
 __all__ = [

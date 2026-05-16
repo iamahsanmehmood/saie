@@ -11,7 +11,6 @@ import subprocess
 import time
 import winreg
 from pathlib import Path
-from typing import Optional
 
 from .logger import get_logger
 
@@ -25,7 +24,7 @@ _COMMON_PATHS = [
 ]
 
 
-def find_sketchup_exe() -> Optional[Path]:
+def find_sketchup_exe() -> Path | None:
     """Auto-detect SketchUp installation from registry and common paths."""
     # Try Windows registry first
     try:
@@ -66,11 +65,12 @@ def _set_active_port(port: int):
         f.write(str(port))
 
 
-def _find_sketchup_with_model(filepath: str) -> Optional[int]:
+def _find_sketchup_with_model(filepath: str) -> int | None:
     """Scan ports 9876-9885 to find if a SketchUp instance already has this model open."""
-    from su_mcp_bridge.transport.ws_client import SketchUpWSClient
     import os
-    
+
+    from su_mcp_bridge.transport.ws_client import SketchUpWSClient
+
     abs_path = os.path.abspath(filepath).lower()
     for port in range(9876, 9886):
         try:
@@ -86,14 +86,16 @@ def _find_sketchup_with_model(filepath: str) -> Optional[int]:
     return None
 
 
-def start_sketchup(filepath: str = "", wait_for_bridge: bool = True, timeout: int = 30) -> Optional[subprocess.Popen]:
+def start_sketchup(
+    filepath: str = "", wait_for_bridge: bool = True, timeout: int = 30
+) -> subprocess.Popen | None:
     """Launch SketchUp, optionally opening a file.
-    
+
     Args:
         filepath: Path to .skp file to open (optional)
         wait_for_bridge: If True, wait for the WebSocket bridge to become available
         timeout: Seconds to wait for bridge connection
-    
+
     Returns:
         The subprocess.Popen object, or None if SketchUp wasn't found
     """
@@ -105,10 +107,14 @@ def start_sketchup(filepath: str = "", wait_for_bridge: bool = True, timeout: in
     if filepath and Path(filepath).exists():
         found_port = _find_sketchup_with_model(filepath)
         if found_port:
-            log.info(f"Model already open in SketchUp (port {found_port}). Switching active context.")
+            log.info(
+                f"Model already open in SketchUp (port {found_port}). Switching active context."
+            )
             _set_active_port(found_port)
+
             class ExistingProc:
                 pid = "existing"
+
             return ExistingProc()
 
     cmd = [str(exe)]
@@ -131,7 +137,7 @@ def start_sketchup(filepath: str = "", wait_for_bridge: bool = True, timeout: in
 
 def _wait_for_bridge_connection(timeout: int = 30) -> bool:
     """Poll until the WebSocket bridge accepts connections."""
-    from su_mcp_bridge.transport.ws_client import SketchUpWSClient, BridgeConnectionError
+    from su_mcp_bridge.transport.ws_client import BridgeConnectionError, SketchUpWSClient
 
     host = os.environ.get("SKETCHUP_HOST", "localhost")
     port = int(os.environ.get("SKETCHUP_PORT", "9876"))
